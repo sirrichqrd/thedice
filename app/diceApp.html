@@ -431,6 +431,86 @@ input{font-family:inherit;color:inherit;background:transparent;border:none;outli
 .print-footer{margin-top:42px;padding-top:14px;border-top:1px solid #ddd;font-size:8pt;color:#888;text-align:center;line-height:1.7}
 
 /* ==================================================================
+   PWA INSTALL PROMPT — THE DICE 2.0 Native (Android + iOS)
+   ================================================================== */
+.install-prompt{
+  position:fixed;
+  left:50%;
+  bottom:calc(26px + env(safe-area-inset-bottom));
+  z-index:85;
+  width:min(420px, calc(100vw - 24px));
+  transform:translateX(-50%) translateY(calc(100% + 40px));
+  opacity:0;
+  pointer-events:none;
+  transition:transform .55s cubic-bezier(.2,.8,.2,1), opacity .35s ease;
+  filter:drop-shadow(var(--shadow));
+}
+.install-prompt.show{
+  transform:translateX(-50%) translateY(0);
+  opacity:1;
+  pointer-events:auto;
+}
+.install-prompt-content{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  background:var(--bg-elev);
+  border:1px solid var(--border-strong);
+  border-left:2px solid var(--accent);
+  border-radius:14px;
+  padding:10px 10px 10px 12px;
+  backdrop-filter:blur(18px) saturate(1.1);
+  position:relative;
+  overflow:hidden;
+}
+.install-prompt-content::before{
+  content:'';
+  position:absolute; inset:0;
+  background:
+    radial-gradient(420px 120px at 0% 0%, rgba(var(--accent-rgb),.10), transparent 70%),
+    radial-gradient(300px 100px at 100% 100%, rgba(var(--accent-2-rgb),.08), transparent 70%);
+  pointer-events:none;
+}
+.install-prompt-icon{
+  flex:none;
+  width:38px; height:38px;
+  display:grid; place-items:center;
+  background:var(--accent);
+  color:var(--bg);
+  border-radius:10px;
+  font-family:'Fraunces',serif;
+  font-weight:900;
+  font-size:18px;
+  box-shadow:0 0 0 1px var(--border-strong), 0 6px 18px rgba(var(--accent-rgb),.35);
+  position:relative; z-index:1;
+}
+.install-prompt-text{flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; position:relative; z-index:1}
+.install-prompt-text strong{
+  font-family:'Fraunces',serif; font-weight:700; font-size:14.5px; color:var(--fg);
+}
+.install-prompt-text span{
+  font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted);
+}
+.install-action{
+  flex:none; height:34px; padding:0 16px; border-radius:999px;
+  background:var(--accent); color:var(--bg);
+  font-family:'JetBrains Mono',monospace; font-weight:700; font-size:10px; letter-spacing:.16em;
+  box-shadow:0 0 0 1px rgba(var(--accent-rgb),.25) inset, 0 8px 20px rgba(var(--accent-rgb),.3);
+  transition:transform .15s, filter .2s;
+  position:relative; z-index:1;
+}
+.install-action:hover{filter:brightness(1.08); transform:translateY(-1px)}
+.install-close{
+  flex:none; width:30px; height:30px; border-radius:8px; border:1px solid var(--border);
+  color:var(--muted); display:grid; place-items:center; font-size:18px; transition:all .2s; position:relative; z-index:1;
+}
+.install-close:hover{background:var(--bg-elev-2); color:var(--fg); border-color:var(--border-strong)}
+@media all and (display-mode: standalone){ .install-prompt{display:none !important} }
+@media(max-width:480px){
+  .install-prompt{width:calc(100vw - 16px); bottom:calc(12px + env(safe-area-inset-bottom))}
+}
+
+/* ==================================================================
    Responsive
    ================================================================== */
 @media(min-width:901px){
@@ -714,6 +794,19 @@ input{font-family:inherit;color:inherit;background:transparent;border:none;outli
 <div class="toast-wrap" id="toastWrap"></div>
 <div class="sr-only" aria-live="polite" id="live"></div>
 <div class="print-area" id="printArea"></div>
+
+<!-- PWA INSTALL PROMPT -->
+<div id="installPrompt" class="install-prompt" aria-hidden="true">
+  <div class="install-prompt-content">
+    <img src="/dicelogo.png" alt="dicelogo" class="install-prompt-icon">
+    <div class="install-prompt-text">
+      <strong>Install The Dice</strong>
+      <span>Keep The Dice on your device · Offline ready</span>
+    </div>
+    <button id="installAppBtn" class="install-action" type="button">INSTALL</button>
+    <button id="closeInstallPrompt" class="install-close" type="button" aria-label="Close">×</button>
+  </div>
+</div>
 
 <script type="module">
 import * as THREE from 'three';
@@ -2082,6 +2175,7 @@ addEventListener('pointerdown', ()=>Sound.resume(), { once:true });
   }catch(e){ console.warn(e); }
 })();
 </script>
+
 <script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
@@ -2091,5 +2185,184 @@ if ("serviceWorker" in navigator) {
   });
 }
 </script>
+
+<script>
+/* =========================================================
+   THE DICE — PWA INSTALL EXPERIENCE
+   ========================================================= */
+
+let deferredInstallPrompt = null;
+
+const installPrompt =
+  document.getElementById("installPrompt");
+
+const installAppBtn =
+  document.getElementById("installAppBtn");
+
+const closeInstallPrompt =
+  document.getElementById("closeInstallPrompt");
+
+
+// ---------------------------------------------------------
+// DEVICE / INSTALL STATE
+// ---------------------------------------------------------
+
+const isIOS =
+  /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+  (
+    navigator.platform === "MacIntel" &&
+    navigator.maxTouchPoints > 1
+  );
+
+const isStandalone =
+  window.matchMedia("(display-mode: standalone)").matches ||
+  window.navigator.standalone === true;
+
+
+// ---------------------------------------------------------
+// SHOW / HIDE
+// ---------------------------------------------------------
+
+function showInstallPrompt() {
+
+  if (!installPrompt || isStandalone) return;
+
+  installPrompt.classList.add("show");
+  installPrompt.setAttribute("aria-hidden", "false");
+}
+
+
+function hideInstallPrompt() {
+
+  if (!installPrompt) return;
+
+  installPrompt.classList.remove("show");
+  installPrompt.setAttribute("aria-hidden", "true");
+}
+
+
+// ---------------------------------------------------------
+// ANDROID / CHROME
+// ---------------------------------------------------------
+
+window.addEventListener("beforeinstallprompt", (event) => {
+
+  event.preventDefault();
+
+  deferredInstallPrompt = event;
+
+  // Let the app load first, then slide the prompt in.
+  setTimeout(() => {
+    showInstallPrompt();
+  }, 1200);
+
+});
+
+
+// ---------------------------------------------------------
+// INSTALL BUTTON
+// ---------------------------------------------------------
+
+installAppBtn?.addEventListener("click", async () => {
+
+  // Android / Chrome
+  if (deferredInstallPrompt) {
+
+    deferredInstallPrompt.prompt();
+
+    const { outcome } =
+      await deferredInstallPrompt.userChoice;
+
+    console.log("The Dice install:", outcome);
+
+    deferredInstallPrompt = null;
+
+    hideInstallPrompt();
+
+    return;
+  }
+
+  // iOS
+  if (isIOS && !isStandalone) {
+
+    showIOSInstructions();
+
+    return;
+  }
+
+});
+
+// ---------------------------------------------------------
+// CLOSE
+// ---------------------------------------------------------
+
+closeInstallPrompt?.addEventListener(
+  "click",
+  hideInstallPrompt
+);
+
+
+// ---------------------------------------------------------
+// iOS
+// ---------------------------------------------------------
+
+function showIOSInstructions() {
+
+  alert(
+    "Install The Dice on your iPhone or iPad:\n\n" +
+    "1. Tap the Share button in Safari.\n\n" +
+    "2. Select “Add to Home Screen”.\n\n" +
+    "3. Tap “Add”."
+  );
+
+}
+
+// ---------------------------------------------------------
+// INSTALL COMPLETE
+// ---------------------------------------------------------
+
+window.addEventListener("appinstalled", () => {
+
+  deferredInstallPrompt = null;
+
+  hideInstallPrompt();
+
+  console.log("The Dice has been installed.");
+
+});
+
+// PWA UPDATE DETECTOR — shows toast when new version is ready
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/app/sw.js').then(reg => {
+    reg.addEventListener('updatefound', () => {
+      const newWorker = reg.installing;
+      newWorker.addEventListener('statechange', () => {
+        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+          // New version waiting
+          if (confirm("New version of The Dice is available. Update now?")) {
+            newWorker.postMessage({ type: "SKIP_WAITING" });
+          }
+        }
+      });
+    });
+  });
+
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
+}
+</script>
+
+<script>
+if (isIOS && !isStandalone) {
+  setTimeout(() => {
+    showInstallPrompt();
+  }, 1200);
+}
+</script>
+
 </body>
 </html>
