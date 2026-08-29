@@ -1,0 +1,2095 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>THE DICE 2.0 — Neutral Decision Engine</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,400;1,9..144,600&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="icon" type="image/svg" href="favicon.svg">
+<link rel="apple-touch-icon" href="favicon.svg">
+<link rel="shortcut icon" type="image/svg" href="favicon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="The Dice">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="/app/manifest.json">
+<meta name="theme-color" content="#1c1a14">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<style>
+/* ==================================================================
+   THE DICE 2.0 — shared design tokens (one system, three themes)
+   ================================================================== */
+:root[data-theme="dark"]{
+  --bg:#0c0b09; --bg-elev:#14120e; --bg-elev-2:#1c1a14;
+  --fg:#f0ead6; --fg-dim:#c9c1ad; --muted:#8a8275;
+  --accent:#f59e0b; --accent-rgb:245,158,11;
+  --accent-2:#06b6d4; --accent-2-rgb:6,182,212;
+  --border:rgba(240,234,214,.08); --border-strong:rgba(240,234,214,.18);
+  --card:#15130e; --code-bg:#060503; --code-fg:#f0ead6;
+  --ok:#5eead4; --ok-rgb:94,234,212; --bad:#ff5f56; --bad-rgb:255,95,86;
+  --shadow:0 30px 80px rgba(0,0,0,.45);
+}
+:root[data-theme="light"]{
+  --bg:#f3ecdc; --bg-elev:#faf3e1; --bg-elev-2:#fffaee;
+  --fg:#1a1610; --fg-dim:#3d362b; --muted:#6b6358;
+  --accent:#c2410c; --accent-rgb:194,65,12;
+  --accent-2:#0e7490; --accent-2-rgb:14,116,144;
+  --border:rgba(26,22,16,.12); --border-strong:rgba(26,22,16,.26);
+  --card:#fffaee; --code-bg:#1a1610; --code-fg:#f3ecdc;
+  --ok:#0f766e; --ok-rgb:15,118,110; --bad:#c0392b; --bad-rgb:192,57,43;
+  --shadow:0 24px 60px rgba(26,22,16,.14);
+}
+:root[data-theme="cyber"]{
+  --bg:#02060a; --bg-elev:#050d10; --bg-elev-2:#071318;
+  --fg:#4eff96; --fg-dim:#8affb8; --muted:#2a8a5e;
+  --accent:#ffea00; --accent-rgb:255,234,0;
+  --accent-2:#ff10f0; --accent-2-rgb:255,16,240;
+  --border:rgba(78,255,150,.16); --border-strong:rgba(78,255,150,.4);
+  --card:#050d10; --code-bg:#000; --code-fg:#4eff96;
+  --ok:#4eff96; --ok-rgb:78,255,150; --bad:#ff4d6d; --bad-rgb:255,77,109;
+  --shadow:0 30px 80px rgba(0,0,0,.6);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+html,body{background:var(--bg);color:var(--fg)}
+body{
+  font-family:'Space Grotesk',sans-serif;font-size:16px;line-height:1.5;
+  overflow-x:hidden;-webkit-font-smoothing:antialiased;min-height:100dvh;
+}
+button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer;touch-action:manipulation}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input{font-family:inherit;color:inherit;background:transparent;border:none;outline:none}
+::selection{background:var(--accent);color:var(--bg)}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:4px}
+::-webkit-scrollbar-track{background:transparent}
+
+.f-disp{font-family:'Fraunces',serif}
+.f-mono{font-family:'JetBrains Mono',monospace}
+
+/* ambient background — grid + drifting dots (themed) */
+.bg-grid-layer{
+  position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:
+    linear-gradient(var(--border) 1px,transparent 1px),
+    linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:56px 56px;
+  mask-image:radial-gradient(ellipse at center,#000 20%,transparent 75%);
+  -webkit-mask-image:radial-gradient(ellipse at center,#000 20%,transparent 75%);
+}
+.float-dot{position:fixed;border-radius:50%;filter:blur(70px);opacity:.16;pointer-events:none;z-index:0;animation:drift 20s ease-in-out infinite}
+.float-dot.d1{width:420px;height:420px;background:var(--accent);top:-120px;left:-100px}
+.float-dot.d2{width:380px;height:380px;background:var(--accent-2);bottom:-120px;right:-90px;animation-delay:-7s}
+@keyframes drift{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(50px,-40px) scale(1.08)}66%{transform:translate(-30px,44px) scale(.94)}}
+
+/* ==================================================================
+   App shell
+   ================================================================== */
+.app{position:relative;z-index:1;display:grid;grid-template-rows:64px 1fr;height:100dvh}
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:0 22px;border-bottom:1px solid var(--border);
+  background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(14px);
+}
+.brand{display:flex;align-items:baseline;gap:14px;min-width:0}
+.logo{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:15px;letter-spacing:.02em}
+.logo-cursor{display:inline-block;width:.5em;height:1em;background:var(--accent);margin-left:3px;vertical-align:text-bottom;animation:blink 1.1s steps(1) infinite}
+@keyframes blink{0%,50%{opacity:1}51%,100%{opacity:0}}
+.brand-sub{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.22em;color:var(--muted);white-space:nowrap}
+.statusline{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.18em;color:var(--muted);text-align:center;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top-actions{display:flex;align-items:center;gap:10px}
+
+.theme-toggle{display:inline-flex;background:var(--bg-elev);border:1px solid var(--border-strong);border-radius:999px;padding:3px;gap:2px}
+.theme-btn{width:30px;height:30px;border-radius:999px;display:grid;place-items:center;color:var(--muted);transition:all .3s}
+.theme-btn svg{width:13px;height:13px}
+.theme-btn.active{background:var(--accent);color:var(--bg);box-shadow:0 0 12px rgba(var(--accent-rgb),.45)}
+.ibtn{width:34px;height:34px;border:1px solid var(--border-strong);border-radius:10px;display:grid;place-items:center;color:var(--fg-dim);transition:all .2s}
+.ibtn:hover{background:var(--bg-elev-2);color:var(--fg)}
+.ibtn svg{width:15px;height:15px}
+#soundToggle .icon-off{display:none}
+#soundToggle.muted .icon-on{display:none}
+#soundToggle.muted .icon-off{display:block}
+#teleToggle{display:none}
+
+/* main 3-column instrument grid */
+.main{display:grid;grid-template-columns:minmax(340px,404px) minmax(0,1fr) 302px;height:100%;min-height:0}
+.col-left{border-right:1px solid var(--border);background:var(--bg-elev);overflow-y:auto;min-height:0;padding:22px 22px 34px}
+.col-right{border-left:1px solid var(--border);background:var(--bg-elev);overflow-y:auto;min-height:0;padding:22px 20px 30px}
+
+/* ==================================================================
+   Setup / result panes
+   ================================================================== */
+.sec-label{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.22em;color:var(--muted);margin-bottom:16px}
+.pane{display:flex;flex-direction:column;gap:16px;animation:paneIn .5s cubic-bezier(.2,.8,.2,1) both}
+@keyframes paneIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+.title-input{
+  width:100%;font-family:'Fraunces',serif;font-weight:700;font-size:24px;line-height:1.2;
+  padding:6px 0 10px;border-bottom:1.5px solid var(--border-strong);transition:border-color .2s;
+}
+.title-input::placeholder{color:var(--muted);font-weight:400;font-style:italic}
+.title-input:focus{border-bottom-color:var(--accent)}
+
+.field-label{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.22em;color:var(--muted)}
+.field-label-row{display:flex;justify-content:space-between;align-items:baseline}
+.count{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:.08em}
+
+.seg{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--border-strong);border-radius:12px;overflow:hidden}
+.seg-btn{padding:10px;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;color:var(--muted);transition:all .2s}
+.seg-btn:first-child{border-right:1px solid var(--border-strong)}
+.seg-btn.active{background:var(--accent);color:var(--bg);font-weight:700}
+
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{
+  display:inline-flex;align-items:center;border:1px solid var(--border);background:var(--bg-elev-2);
+  border-radius:999px;padding:7px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;
+  letter-spacing:.1em;color:var(--fg-dim);transition:all .2s;
+}
+.chip::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--muted);margin-right:7px;transition:background .2s}
+.chip:hover{border-color:var(--border-strong)}
+.chip.active{border-color:rgba(var(--accent-rgb),.6);color:var(--fg)}
+.chip.active::before{background:var(--accent)}
+
+.blind-row{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
+.blind-row input{position:absolute;opacity:0;width:1px;height:1px}
+.blind-row .box{width:32px;height:18px;border:1px solid var(--border-strong);border-radius:999px;position:relative;flex:none;transition:all .2s}
+.blind-row .box::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--muted);transition:all .2s}
+.blind-row input:checked + .box{border-color:var(--accent);background:rgba(var(--accent-rgb),.12)}
+.blind-row input:checked + .box::after{left:16px;background:var(--accent)}
+.blind-row input:focus-visible + .box{outline:2px solid var(--accent);outline-offset:2px}
+.blind-text{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:var(--muted)}
+
+.choices{display:flex;flex-direction:column;gap:7px;max-height:308px;overflow-y:auto;padding-right:2px}
+.choice-row{display:flex;align-items:center;gap:8px;background:var(--bg-elev-2);border:1px solid var(--border);border-radius:11px;padding:4px 6px 4px 4px;transition:border-color .2s;animation:choiceIn .35s cubic-bezier(.2,.8,.2,1) both}
+@keyframes choiceIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+.choice-row:hover{border-color:var(--border-strong)}
+.choice-num{width:32px;text-align:center;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;color:var(--accent);flex:none}
+.choice-input{flex:1;min-width:0;padding:9px 6px;font-size:14.5px}
+.choice-input::placeholder{color:var(--muted)}
+.choice-x{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:var(--muted);flex:none;transition:all .2s}
+.choice-x:hover{color:var(--bad);background:rgba(var(--bad-rgb),.1)}
+.choice-x svg{width:13px;height:13px}
+
+.add-choice{
+  display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border-radius:11px;
+  border:1.5px dashed var(--border-strong);color:var(--muted);
+  font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.14em;transition:all .2s;
+}
+.add-choice:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.add-choice:disabled{opacity:.35;cursor:not-allowed}
+.add-choice .plus{font-size:15px;line-height:1}
+
+.fair{border:1px solid rgba(var(--ok-rgb),.35);background:linear-gradient(135deg,rgba(var(--ok-rgb),.07),transparent 60%);border-radius:16px;padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+.fair-head{display:flex;justify-content:space-between;align-items:center;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.2em;color:var(--muted)}
+.fair-badge{color:var(--ok);border:1px solid rgba(var(--ok-rgb),.4);border-radius:999px;padding:3px 9px;font-size:8.5px;letter-spacing:.16em;display:inline-flex;align-items:center;gap:6px}
+.fair-badge::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.fair-big{display:flex;align-items:baseline;gap:10px}
+.fair-big span:first-child{font-family:'Fraunces',serif;font-weight:900;font-size:clamp(34px,4vw,46px);line-height:1;color:var(--accent);letter-spacing:-.02em}
+.fair-each{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.2em;color:var(--muted)}
+.fair-meta{font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.06em;color:var(--fg-dim)}
+.fair-feats{display:flex;flex-wrap:wrap;gap:5px 14px;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--muted)}
+.fair-feats b{color:var(--ok);font-weight:600}
+
+.cast{
+  position:relative;display:flex;align-items:center;justify-content:center;gap:12px;width:100%;padding:16px;
+  border-radius:999px;background:var(--accent);color:var(--bg);
+  font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12.5px;letter-spacing:.2em;
+  box-shadow:0 10px 34px rgba(var(--accent-rgb),.32);transition:all .2s;overflow:hidden;
+}
+.cast::before{content:'';position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.35),transparent 70%);transform:translateX(-110%);transition:transform .7s}
+.cast:hover:not(:disabled)::before{transform:translateX(110%)}
+.cast:hover:not(:disabled){transform:translateY(-2px)}
+.cast:active:not(:disabled){transform:none}
+.cast:disabled{opacity:.32;cursor:not-allowed;box-shadow:none}
+.cast svg{width:17px;height:17px}
+.cast kbd{font-family:'JetBrains Mono',monospace;font-weight:400;font-size:8.5px;letter-spacing:.14em;border:1px solid color-mix(in srgb,currentColor 45%,transparent);border-radius:6px;padding:3px 7px}
+.foot-note{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.14em;color:var(--muted);text-align:center;line-height:1.8}
+.foot-note.small{font-size:8px;text-align:left}
+
+/* ---- result pane ---- */
+.mismatch{border:1px solid rgba(var(--bad-rgb),.5);background:rgba(var(--bad-rgb),.09);color:var(--bad);border-radius:12px;padding:12px 14px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;line-height:1.7}
+.res-number{font-family:'Fraunces',serif;font-weight:900;font-size:clamp(72px,9vw,110px);line-height:.9;letter-spacing:-.03em;color:var(--accent);animation:numIn .8s cubic-bezier(.2,.8,.2,1) both}
+@keyframes numIn{from{opacity:0;transform:scale(.6);filter:blur(14px)}to{opacity:1;transform:none;filter:none}}
+.res-name{font-family:'Fraunces',serif;font-style:italic;font-weight:600;font-size:clamp(26px,3vw,36px);line-height:1.1;animation:paneIn .6s .15s cubic-bezier(.2,.8,.2,1) both}
+.res-context{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.2em;color:var(--muted);animation:paneIn .6s .25s both}
+.res-rows{display:flex;flex-direction:column;border-top:1px solid var(--border);animation:paneIn .6s .35s both}
+.res-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:9px 2px;border-bottom:1px solid var(--border);font-size:12.5px}
+.res-row .k{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.18em;color:var(--muted)}
+.res-row .v{font-weight:500;text-align:right}
+.res-row .v.mono{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent)}
+.res-row .v.ok{color:var(--ok);font-family:'JetBrains Mono',monospace;font-size:11px}
+.res-row .v.bad{color:var(--bad);font-family:'JetBrains Mono',monospace;font-size:11px}
+#resHash{cursor:pointer}
+#resHash:hover{text-decoration:underline}
+.res-badge{display:inline-flex;align-items:center;gap:9px;align-self:flex-start;padding:9px 16px;border-radius:999px;border:1px solid rgba(var(--ok-rgb),.45);background:rgba(var(--ok-rgb),.08);color:var(--ok);font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:600;letter-spacing:.18em;animation:badgeIn .5s .55s cubic-bezier(.2,1.4,.3,1) both}
+.res-badge.fail{border-color:rgba(var(--bad-rgb),.5);background:rgba(var(--bad-rgb),.08);color:var(--bad)}
+@keyframes badgeIn{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:none}}
+.res-badge .okc{width:16px;height:16px;border-radius:50%;background:var(--ok);color:var(--bg);display:grid;place-items:center;font-size:10px;font-weight:800}
+.res-badge.fail .okc{background:var(--bad)}
+.res-actions{display:flex;flex-direction:column;gap:9px;animation:paneIn .6s .65s both}
+.btn-primary{width:100%;padding:14px;border-radius:999px;background:var(--accent);color:var(--bg);font-family:'JetBrains Mono',monospace;font-weight:700;font-size:11px;letter-spacing:.18em;box-shadow:0 8px 26px rgba(var(--accent-rgb),.28);transition:all .2s;display:flex;justify-content:center;align-items:center;gap:10px}
+.btn-primary:hover:not(:disabled){transform:translateY(-2px)}
+.btn-primary:disabled{opacity:.4;cursor:default;box-shadow:none}
+.btn-sec{width:100%;padding:12px;border-radius:999px;border:1px solid var(--border-strong);background:var(--bg-elev-2);color:var(--fg);font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10px;letter-spacing:.16em;transition:all .2s;display:flex;justify-content:center;align-items:center;gap:9px}
+.btn-sec:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.btn-sec:disabled{opacity:.4;cursor:default}
+.btn-sec kbd{font-weight:400;font-size:8px;border:1px solid var(--border-strong);border-radius:5px;padding:2px 6px;letter-spacing:.1em}
+.btn-sec.small{padding:10px;font-size:9px}
+.btn-ghost{width:100%;padding:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.16em;transition:color .2s}
+.btn-ghost:hover{color:var(--bad)}
+#setupPane.locked{opacity:.45;pointer-events:none;filter:saturate(.6)}
+
+/* ==================================================================
+   Stage
+   ================================================================== */
+.stage{position:relative;min-height:0;overflow:hidden;user-select:none;-webkit-user-select:none;background:transparent}
+#stageCanvas{position:absolute;inset:0;width:100%;height:100%;z-index:2;touch-action:none;cursor:grab}
+#stageCanvas.dragging{cursor:grabbing}
+#bigNum{
+  position:absolute;inset:0;display:grid;place-items:center;z-index:1;pointer-events:none;
+  font-family:'Fraunces',serif;font-weight:900;font-size:clamp(160px,30vh,340px);line-height:.8;letter-spacing:-.02em;
+  color:transparent;-webkit-text-stroke:2px var(--fg);opacity:0;transform:translateY(-3%);
+}
+#bigNum.stamp{animation:stamp .45s cubic-bezier(.22,1.2,.36,1) forwards}
+@keyframes stamp{0%{opacity:0;transform:translateY(-3%) scale(.92)}55%{opacity:.5;transform:translateY(-3%) scale(1.03)}100%{opacity:.16;transform:translateY(-3%) scale(1)}}
+.corner{position:absolute;width:18px;height:18px;z-index:3;pointer-events:none;border:0 solid var(--border-strong)}
+.c-tl{left:14px;top:14px;border-left-width:1.5px;border-top-width:1.5px}
+.c-tr{right:14px;top:14px;border-right-width:1.5px;border-top-width:1.5px}
+.c-bl{left:14px;bottom:14px;border-left-width:1.5px;border-bottom-width:1.5px}
+.c-br{right:14px;bottom:14px;border-right-width:1.5px;border-bottom-width:1.5px}
+.sidel{position:absolute;z-index:3;font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.3em;color:var(--muted);pointer-events:none;white-space:nowrap}
+.sidel-r{right:15px;top:50%;transform:translateY(-50%);writing-mode:vertical-rl}
+.sidel-l{left:15px;top:50%;transform:translateY(-50%) rotate(180deg);writing-mode:vertical-rl}
+
+.authority{
+  position:absolute;left:50%;top:16px;transform:translateX(-50%);z-index:4;
+  display:inline-flex;align-items:center;gap:8px;padding:7px 15px;border-radius:999px;
+  background:color-mix(in srgb,var(--bg) 88%,transparent);border:1px solid rgba(var(--accent-rgb),.4);
+  font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--accent);
+  backdrop-filter:blur(10px);opacity:0;transition:opacity .35s,transform .35s;pointer-events:none;white-space:nowrap;
+}
+.authority.show{opacity:1}
+.authority .dot{width:6px;height:6px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);flex:none}
+.authority.bad{border-color:rgba(var(--bad-rgb),.5);color:var(--bad)}
+
+.stage-top{position:absolute;top:52px;left:0;right:0;z-index:3;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;pointer-events:none;padding:0 70px}
+.phase-eyebrow{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.28em;color:var(--muted)}
+.phase-word{font-family:'Fraunces',serif;font-weight:900;font-size:clamp(24px,3vh,32px);letter-spacing:-.01em;line-height:1.05}
+.phase-meta{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--fg-dim)}
+.phase-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;max-width:100%;margin-top:3px}
+.phase-chips .chip{padding:4px 9px;font-size:8.5px;pointer-events:none}
+
+.stage-bottom{position:absolute;bottom:16px;left:0;right:0;z-index:3;display:flex;flex-direction:column;align-items:center;gap:9px;pointer-events:none}
+.hint{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.18em;color:var(--muted);text-align:center}
+.views{display:flex;border:1px solid var(--border-strong);border-radius:999px;overflow:hidden;background:color-mix(in srgb,var(--bg) 80%,transparent);backdrop-filter:blur(8px);pointer-events:auto}
+.view-btn{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.1em;padding:9px 15px;color:var(--fg-dim);display:flex;gap:7px;align-items:center;transition:all .2s;border-left:1px solid var(--border)}
+.view-btn:first-child{border-left:none}
+.view-btn i{font-style:normal;color:var(--muted);font-size:8.5px}
+.view-btn:hover{background:var(--bg-elev-2)}
+.view-btn.active{background:var(--accent);color:var(--bg)}
+.view-btn.active i{color:color-mix(in srgb,var(--bg) 60%,transparent)}
+
+.history-strip{
+  position:absolute;left:16px;bottom:16px;right:auto;max-width:min(46%,420px);z-index:3;
+  display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);
+  border-radius:13px;background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(12px);
+}
+.strip-label{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.2em;color:var(--muted);flex:none}
+.strip-items{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.strip-items::-webkit-scrollbar{display:none}
+.h-item{flex:none;padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:var(--bg-elev-2);font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--fg-dim);white-space:nowrap;transition:all .2s}
+.h-item:hover{border-color:var(--accent);color:var(--fg)}
+.h-item .hn{color:var(--accent);font-weight:600}
+.h-item .warn{color:var(--bad)}
+.h-item.clear{color:var(--muted)}
+.h-item.clear:hover{color:var(--bad);border-color:rgba(var(--bad-rgb),.5)}
+
+/* ==================================================================
+   Telemetry column
+   ================================================================== */
+.tele-sec{display:flex;flex-direction:column;gap:8px;padding-bottom:18px;margin-bottom:16px;border-bottom:1px solid var(--border)}
+.tele-sec:last-child{border-bottom:none;margin-bottom:0}
+.t-row{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:11px}
+.t-row span{color:var(--muted);letter-spacing:.1em;font-size:9px}
+.t-row b{font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:.03em;font-size:10.5px}
+.t-row b.ok{color:var(--ok)}
+.t-row b.bad{background:var(--bad);color:var(--bg);padding:0 6px;border-radius:4px}
+.method{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.1em;line-height:1.8;color:var(--muted);border-left:2px solid var(--accent);padding-left:10px}
+.dist{display:flex;gap:10px;align-items:flex-end;height:46px;margin-top:6px}
+.dist-col{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1}
+.dist-bar{width:100%;max-width:14px;background:var(--fg);opacity:.85;height:2px;transition:height .3s;border-radius:2px}
+.dist-n{font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--muted)}
+.suite-out{font-family:'JetBrains Mono',monospace;font-size:9.5px;line-height:1.9;letter-spacing:.06em;color:var(--fg-dim);white-space:pre-line}
+.suite-out .ok{color:var(--ok)}
+.suite-out .bad{color:var(--bad)}
+
+/* ==================================================================
+   Record panel / modal / toasts
+   ================================================================== */
+.record-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);z-index:49;opacity:0;pointer-events:none;transition:opacity .3s}
+.record-overlay.open{opacity:1;pointer-events:auto}
+.record-panel{
+  position:fixed;top:0;right:0;width:min(440px,94vw);height:100dvh;z-index:50;
+  background:var(--bg-elev);border-left:1px solid var(--border-strong);
+  transform:translateX(102%);transition:transform .4s cubic-bezier(.2,.8,.2,1);
+  display:flex;flex-direction:column;box-shadow:var(--shadow);
+}
+.record-panel.open{transform:none}
+.record-head{display:flex;justify-content:space-between;align-items:center;padding:18px 22px;border-bottom:1px solid var(--border);padding-top:max(18px,env(safe-area-inset-top))}
+.record-title{font-family:'Fraunces',serif;font-weight:700;font-size:19px}
+.record-body{flex:1;overflow-y:auto;padding:20px 22px;display:flex;flex-direction:column;gap:18px}
+.r-sec{display:flex;flex-direction:column;gap:8px}
+.r-sec-t{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.2em;color:var(--muted)}
+.r-field{display:flex;flex-direction:column;gap:3px;background:var(--bg-elev-2);border:1px solid var(--border);border-radius:10px;padding:10px 13px}
+.r-field .k{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.16em;color:var(--muted)}
+.r-field .v{font-size:13.5px;word-break:break-word}
+.r-field .v.mono{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);word-break:break-all}
+.r-field .v.big{font-family:'Fraunces',serif;font-weight:900;font-size:30px;color:var(--accent);line-height:1.1}
+.r-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.r-choices{display:flex;flex-direction:column;gap:3px;background:var(--bg-elev-2);border:1px solid var(--border);border-radius:10px;padding:7px;max-height:210px;overflow-y:auto}
+.r-choice{display:flex;gap:10px;padding:5px 10px;border-radius:7px;font-size:12.5px}
+.r-choice .n{font-family:'JetBrains Mono',monospace;color:var(--muted);font-size:10.5px;padding-top:1px}
+.r-choice.sel{background:rgba(var(--accent-rgb),.13);color:var(--accent)}
+.r-choice.sel .n{color:var(--accent)}
+.r-status{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;background:rgba(var(--ok-rgb),.07);border:1px solid rgba(var(--ok-rgb),.4);color:var(--ok);font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:600;letter-spacing:.12em}
+.r-status.fail{background:rgba(var(--bad-rgb),.07);border-color:rgba(var(--bad-rgb),.5);color:var(--bad)}
+.r-status .c{width:18px;height:18px;border-radius:50%;background:var(--ok);color:var(--bg);display:grid;place-items:center;font-size:11px;font-weight:800;flex:none}
+.r-status.fail .c{background:var(--bad)}
+.hash-block{background:var(--code-bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.hash-block .k{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.16em;color:var(--muted);margin-bottom:6px}
+.hash-block .h{font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.7;color:var(--code-fg);word-break:break-all}
+.record-actions{display:flex;gap:8px;padding:16px 22px;border-top:1px solid var(--border);padding-bottom:max(16px,env(safe-area-inset-bottom))}
+.record-actions .btn-sec,.record-actions .btn-primary{padding:11px;font-size:9.5px}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(7px);z-index:60;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.open{display:flex;animation:fadeIn .25s}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal{background:var(--bg-elev);border:1px solid var(--border-strong);border-radius:18px;padding:30px 26px;max-width:400px;width:100%;text-align:center;box-shadow:var(--shadow);animation:modalPop .35s cubic-bezier(.2,1.2,.3,1)}
+@keyframes modalPop{from{opacity:0;transform:scale(.92) translateY(16px)}to{opacity:1;transform:none}}
+.modal-icon{width:52px;height:52px;margin:0 auto 14px;border-radius:50%;border:1px solid rgba(var(--bad-rgb),.45);background:rgba(var(--bad-rgb),.09);display:grid;place-items:center;color:var(--bad);font-family:'Fraunces',serif;font-weight:900;font-size:24px}
+.modal-title{font-family:'Fraunces',serif;font-weight:700;font-size:21px;margin-bottom:8px}
+.modal-text{font-size:13.5px;color:var(--fg-dim);line-height:1.6;margin-bottom:22px}
+.modal-actions{display:flex;gap:9px}
+.modal-actions button{flex:1;padding:12px;border-radius:999px;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10px;letter-spacing:.14em}
+.btn-cancel{background:var(--bg-elev-2);border:1px solid var(--border-strong);color:var(--fg)}
+.btn-confirm{background:var(--bad);color:#fff}
+.btn-confirm:hover{transform:translateY(-1px)}
+
+.toast-wrap{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);z-index:80;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;padding-bottom:env(safe-area-inset-bottom)}
+.toast{background:var(--bg-elev);border:1px solid var(--border-strong);border-radius:999px;padding:11px 18px;font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:var(--fg);box-shadow:var(--shadow);animation:toastIn .3s cubic-bezier(.2,.8,.2,1);pointer-events:auto}
+.toast.success{border-color:rgba(var(--ok-rgb),.5);color:var(--ok)}
+.toast.error{border-color:rgba(var(--bad-rgb),.5);color:var(--bad)}
+.toast.info{border-color:rgba(var(--accent-rgb),.5);color:var(--accent)}
+.toast.removing{animation:toastOut .3s forwards}
+@keyframes toastIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes toastOut{to{opacity:0;transform:translateY(16px)}}
+
+.sr-only{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+
+/* ==================================================================
+   Print area — the auditable document
+   ================================================================== */
+.print-area{display:none}
+@media print{
+  body>*{display:none !important}
+  .print-area{display:block !important;position:static;background:#fff;color:#111}
+  @page{size:A4;margin:16mm}
+}
+.print-inner{max-width:700px;margin:0 auto;font-family:Georgia,'Times New Roman',serif;color:#111;font-size:12pt}
+.print-header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #111;padding-bottom:16px;margin-bottom:28px}
+.print-brand{font-size:22pt;font-weight:700;letter-spacing:2px}
+.print-brand-sub{font-size:9pt;color:#555;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px}
+.print-meta{text-align:right;font-size:9pt;color:#555;line-height:1.7}
+.print-title-block{text-align:center;margin:28px 0}
+.print-title-label{font-size:9pt;letter-spacing:2px;text-transform:uppercase;color:#555}
+.print-title{font-size:19pt;font-weight:700;margin:8px 0}
+.print-result-block{text-align:center;padding:28px;background:#f8f6f0;border:1px solid #d4c896;margin:22px 0}
+.print-result-number{font-size:52pt;font-weight:700;color:#8a6a22;line-height:1}
+.print-result-name{font-size:22pt;font-weight:600;margin-top:10px}
+.print-result-context{font-size:9.5pt;letter-spacing:1.5px;text-transform:uppercase;color:#555;margin-top:8px}
+.print-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 30px;margin:22px 0}
+.print-field{padding:7px 0;border-bottom:1px solid #ddd}
+.print-field-label{font-size:8pt;letter-spacing:1.5px;text-transform:uppercase;color:#777;margin-bottom:3px}
+.print-field-value{font-size:10.5pt;font-weight:600}
+.print-field-value.mono{font-family:'Courier New',monospace;font-size:9.5pt;word-break:break-all;font-weight:400}
+.print-choices{margin:14px 0;font-size:10pt;line-height:1.9}
+.print-choices .sel{font-weight:700}
+.print-status{margin-top:26px;text-align:center;padding:13px;border:2px solid #111;font-size:12.5pt;font-weight:700;letter-spacing:4px}
+.print-hash{margin-top:16px;font-family:'Courier New',monospace;font-size:8pt;color:#666;text-align:center;word-break:break-all;line-height:1.6}
+.print-footer{margin-top:42px;padding-top:14px;border-top:1px solid #ddd;font-size:8pt;color:#888;text-align:center;line-height:1.7}
+
+/* ==================================================================
+   Responsive
+   ================================================================== */
+@media(min-width:901px){
+  html,body{height:100%;overflow:hidden}
+}
+@media(min-width:901px) and (max-width:1240px){
+  .col-right{position:fixed;top:64px;right:0;bottom:0;width:302px;transform:translateX(103%);transition:transform .35s cubic-bezier(.2,.8,.2,1);z-index:45;box-shadow:var(--shadow)}
+  .col-right.open{transform:none}
+  #teleToggle{display:grid}
+  .statusline{display:none}
+}
+@media(max-width:900px){
+  html,body{height:auto;overflow:auto}
+  .app{display:block;height:auto}
+  .topbar{position:sticky;top:0;z-index:40}
+  .brand-sub,.statusline{display:none}
+  .main{display:flex;flex-direction:column;height:auto}
+  .stage{height:48dvh;min-height:330px;order:0}
+  .sidel{display:none}
+  .history-strip{max-width:calc(100% - 32px)}
+  .stage-top{top:44px;padding:0 16px}
+  .col-right{order:1;display:flex;overflow-x:auto;border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:12px 14px;gap:22px;background:var(--bg-elev)}
+  .col-right .tele-sec{min-width:236px;border-bottom:none;margin-bottom:0;padding-bottom:0;gap:4px}
+  .t-row.aux,.dist,.method,.foot-note.small{display:none}
+  .col-left{order:2;border-right:none;overflow:visible}
+  .phase-chips{display:none}
+}
+@media(max-height:740px) and (min-width:901px){ .dist,.foot-note.small{display:none} }
+
+/* reduced motion — same authority, calmer motion */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
+  .float-dot,.logo-cursor{animation:none !important}
+  #bigNum.stamp{opacity:.16}
+}
+
+/* --- ACCORDION TELEMETRY (REQ 1) --- */
+.col-right{padding-top:0}
+.tele-acc-head{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  width:100%;padding:16px 0 14px;margin:0 0 6px;
+  border-bottom:1px solid var(--border);
+  font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.18em;
+  color:var(--fg-dim);transition:color .2s;
+}
+.tele-acc-head:hover{color:var(--fg)}
+.tele-acc-head b{font-weight:600;color:var(--fg);font-size:11px}
+.tele-acc-head .acc-icon{width:18px;height:18px;border:1px solid var(--border-strong);border-radius:6px;display:grid;place-items:center;transition:transform .3s, background .2s}
+.tele-acc-head[aria-expanded="true"] .acc-icon{transform:rotate(180deg);background:var(--bg-elev-2)}
+.tele-acc-body{overflow:hidden;max-height:0;transition:max-height .45s cubic-bezier(.2,.8,.2,1), opacity .25s;opacity:.0}
+.tele-acc-body.open{max-height:1600px;opacity:1}
+@media(max-width:900px){
+  .tele-acc-head{padding:10px 0;border-bottom:none;margin-bottom:0;min-width:236px}
+  .tele-acc-body{display:flex;gap:22px;max-height:none !important;opacity:1 !important;overflow-x:auto;overflow-y:hidden;transition:none}
+  .tele-acc-body:not(.open){display:none}
+  .col-right{flex-direction:column;align-items:stretch}
+}
+
+</style>
+</head>
+<body>
+
+<div class="bg-grid-layer"></div>
+<div class="float-dot d1"></div>
+<div class="float-dot d2"></div>
+
+<div class="app">
+  <!-- ======================= HEADER ======================= -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">/dice<span class="logo-cursor"></span></span>
+      <span class="brand-sub">NEUTRAL DECISION ENGINE · REV 2.0</span>
+    </div>
+    <div class="statusline" id="statusLine">ENGINE READY</div>
+    <div class="top-actions">
+      <button id="teleToggle" class="ibtn" aria-label="Toggle telemetry">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      </button>
+      <div class="theme-toggle" role="group" aria-label="Theme">
+        <button class="theme-btn" data-theme="dark" aria-label="Dark theme">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+        <button class="theme-btn" data-theme="light" aria-label="Light theme">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        </button>
+        <button class="theme-btn" data-theme="cyber" aria-label="Cyber theme">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        </button>
+      </div>
+      <button id="soundToggle" class="ibtn" aria-pressed="true" aria-label="Toggle sound and haptics">
+        <svg class="icon-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5.6a9.5 9.5 0 0 1 0 12.8"/></svg>
+        <svg class="icon-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="main">
+    <!-- ======================= LEFT — SETUP / RESULT ======================= -->
+    <aside class="col-left">
+      <section id="setupPane" class="pane">
+        <div class="sec-label">// 00 — DECISION SETUP</div>
+        <input id="titleInput" class="title-input" type="text" maxlength="120" placeholder="What are we deciding?" />
+
+        <div class="field-label">MODE</div>
+        <div class="seg" id="modeSeg" role="tablist">
+          <button class="seg-btn active" data-mode="people" role="tab" aria-selected="true">PEOPLE</button>
+          <button class="seg-btn" data-mode="options" role="tab" aria-selected="false">OPTIONS</button>
+        </div>
+
+        <div class="field-label">CATEGORY</div>
+        <div class="chips" id="catChips">
+          <button class="chip active" data-cat="General Decision">GENERAL</button>
+          <button class="chip" data-cat="Role Assignment">ROLE</button>
+          <button class="chip" data-cat="Representative Selection">REPRESENTATIVE</button>
+          <button class="chip" data-cat="Task Assignment">TASK</button>
+        </div>
+
+        <label class="blind-row" for="blindToggle">
+          <input type="checkbox" id="blindToggle" />
+          <span class="box"></span>
+          <span class="blind-text">DOUBLE-BLIND — HIDE NAMES UNTIL REVEAL</span>
+        </label>
+
+        <div class="field-label-row">
+          <span class="field-label" id="choicesLabel">PEOPLE</span>
+          <span class="count" id="choicesCount">0/36 · MIN 2</span>
+        </div>
+        <div id="choicesList" class="choices"></div>
+        <button id="addChoiceBtn" class="add-choice"><span class="plus">+</span><span id="addChoiceText">ADD PERSON</span></button>
+
+        <div class="fair">
+          <div class="fair-head"><span>EQUAL PROBABILITY</span><span class="fair-badge">VERIFIED</span></div>
+          <div class="fair-big"><span id="fairPct">—</span><span class="fair-each">EACH</span></div>
+          <div class="fair-meta" id="fairMeta">ADD AT LEAST 2 CHOICES</div>
+          <div class="fair-feats"><span><b>✓</b> NO MODULO BIAS</span><span><b>✓</b> INDEPENDENT ROLLS</span><span><b>✓</b> SHA-256 AUDITED</span></div>
+        </div>
+
+        <button id="castBtn" class="cast" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="3.5" width="17" height="17" rx="2.5"/><circle cx="8.6" cy="8.6" r="1.35" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.35" fill="currentColor" stroke="none"/><circle cx="15.4" cy="15.4" r="1.35" fill="currentColor" stroke="none"/></svg>
+          <span>CAST THE DICE</span>
+          <kbd>SPACE</kbd>
+        </button>
+        <div class="foot-note">CRYPTO RNG → RESULT LOCKED → DICE VISUALIZES → FACE VERIFIED</div>
+      </section>
+
+      <section id="resultPane" class="pane" hidden>
+        <div class="sec-label">// 01 — DECISION COMPLETE</div>
+        <div id="mismatchBanner" class="mismatch" hidden>POST-SETTLE VERIFICATION FAILED — MISMATCH DETECTED AND RECORDED. THE CRYPTOGRAPHIC RESULT REMAINS AUTHORITATIVE.</div>
+        <div class="res-number" id="resNumber">#01</div>
+        <div class="res-name" id="resName">—</div>
+        <div class="res-context" id="resContext">—</div>
+        <div class="res-rows">
+          <div class="res-row"><span class="k">PROBABILITY</span><span class="v" id="resProb">—</span></div>
+          <div class="res-row"><span class="k">CHOICES</span><span class="v" id="resChoicesN">—</span></div>
+          <div class="res-row"><span class="k">DICE</span><span class="v mono" id="resDice">—</span></div>
+          <div class="res-row"><span class="k">DECISION ID</span><span class="v mono" id="resId">—</span></div>
+          <div class="res-row"><span class="k">RANDOMNESS</span><span class="v">CRYPTO · REJECTION SAMPLED</span></div>
+          <div class="res-row"><span class="k">ENTROPY</span><span class="v mono" id="resRaw">—</span></div>
+          <div class="res-row"><span class="k">TIMESTAMP</span><span class="v" id="resTs">—</span></div>
+          <div class="res-row"><span class="k">SHA-256</span><span class="v mono" id="resHash">—</span></div>
+          <div class="res-row"><span class="k">VERIFICATION</span><span class="v ok" id="resVerify">—</span></div>
+        </div>
+        <div class="res-badge" id="resBadge"><span class="okc">✓</span><span id="resBadgeText">RESULT VERIFIED</span></div>
+        <div class="res-actions">
+          <button id="acceptBtn" class="btn-primary">ACCEPT RESULT</button>
+          <button id="recordBtn" class="btn-sec">VIEW DECISION RECORD</button>
+          <button id="rollAgainBtn" class="btn-sec">ROLL AGAIN <kbd>SPACE</kbd></button>
+          <button id="restartBtn" class="btn-ghost">RESTART DECISION</button>
+        </div>
+      </section>
+    </aside>
+
+    <!-- ======================= CENTER — 3D STAGE ======================= -->
+    <section class="stage" id="stage">
+      <div class="corner c-tl"></div><div class="corner c-tr"></div>
+      <div class="corner c-bl"></div><div class="corner c-br"></div>
+      <div class="sidel sidel-r">DETERMINISTIC SETTLE STAGE — REV 2.0</div>
+      <div class="sidel sidel-l">FIG. 01 — SQUARE-EDGED VERIFICATION BODY — SCALE 1:1</div>
+
+      <div id="bigNum" aria-hidden="true">—</div>
+      <canvas id="stageCanvas"></canvas>
+
+      <div id="authorityPill" class="authority"><span class="dot"></span><span id="authorityText">ENGINE READY</span></div>
+
+      <div class="stage-top">
+        <div class="phase-eyebrow">ENGINE PHASE</div>
+        <div class="phase-word" id="phaseWord">READY</div>
+        <div class="phase-meta" id="phaseMeta">SET UP YOUR DECISION</div>
+        <div class="phase-chips" id="phaseChips"></div>
+      </div>
+
+      <div class="stage-bottom">
+        <div class="hint" id="hintLine">DRAG — ORBIT · WHEEL — ZOOM · SPACE — CAST · 1 / 2 / 3 — CAMERA</div>
+        <div class="views" id="views">
+          <button class="view-btn active" data-view="0"><i>01</i>PERSPECTIVE</button>
+          <button class="view-btn" data-view="1"><i>02</i>TOP-DOWN</button>
+          <button class="view-btn" data-view="2"><i>03</i>TABLE-LEVEL</button>
+        </div>
+      </div>
+
+      <div class="history-strip" id="historyStrip" hidden>
+        <span class="strip-label">HISTORY</span>
+        <div class="strip-items" id="historyItems"></div>
+      </div>
+    </section>
+
+    <!-- ======================= RIGHT — TELEMETRY (ACCORDION) ======================= -->
+    <aside class="col-right" id="telemetry">
+      <button class="tele-acc-head" id="teleAccHead" aria-expanded="false" aria-controls="teleAccBody">
+        <span><b>// TELEMETRY</b> — CLICK TO EXPAND</span>
+        <span class="acc-icon"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span>
+      </button>
+      <div class="tele-acc-body" id="teleAccBody">
+        <section class="tele-sec">
+          <div class="sec-label">// TELEMETRY</div>
+          <div class="t-row"><span>STATE</span><b id="tState">READY</b></div>
+          <div class="t-row"><span>UPPER FACE</span><b id="tFace">—</b></div>
+          <div class="t-row"><span>PICK</span><b id="tPick">SEALED</b></div>
+          <div class="t-row"><span>RESULT</span><b id="tResult">—</b></div>
+          <div class="t-row"><span>CHECK</span><b id="tCheck">—</b></div>
+          <div class="t-row aux"><span>ANG VEL</span><b id="tVel">0.0 rad/s</b></div>
+          <div class="t-row aux"><span>ALTITUDE</span><b id="tAlt">0.00 u</b></div>
+          <div class="t-row aux"><span>RESIDUAL ERR</span><b id="tErr">—</b></div>
+        </section>
+        <section class="tele-sec">
+          <div class="sec-label">// SESSION LEDGER</div>
+          <div class="t-row"><span>ROLLS</span><b id="lRolls">0000</b></div>
+          <div class="t-row"><span>MATCHED</span><b id="lMatch">0000</b></div>
+          <div class="t-row"><span>MISMATCH</span><b id="lMiss">0000</b></div>
+          <div class="dist" id="dist"></div>
+          <div class="foot-note small">LEDGER COUNTS REAL CASTS ONLY — AUDIT ROLLS EXCLUDED.</div>
+        </section>
+        <section class="tele-sec">
+          <div class="sec-label">// ORIENTATION MAP</div>
+          <div class="method">DETERMINISTIC RESULT-TO-ORIENTATION MAPPING WITH POST-SETTLE FACE VERIFICATION.</div>
+          <div class="t-row"><span>SELF-TEST</span><b id="mapSelf">RUNNING…</b></div>
+          <div class="t-row"><span>LAST SUITE</span><b id="suiteLine">—</b></div>
+          <button id="suiteBtn" class="btn-sec small">RUN FULL SUITE — 726 CONTROLLED ROLLS</button>
+          <div class="suite-out" id="suiteOut"></div>
+        </section>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- Record panel -->
+<div id="recordOverlay" class="record-overlay"></div>
+<aside id="recordPanel" class="record-panel" aria-hidden="true">
+  <div class="record-head">
+    <div class="record-title">Decision Record</div>
+    <button id="recordClose" class="ibtn" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="record-body" id="recordBody"></div>
+  <div class="record-actions">
+    <button id="copyRecord" class="btn-sec">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      COPY RECORD
+    </button>
+    <button id="printRecord" class="btn-primary">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      PRINT RECORD
+    </button>
+  </div>
+</aside>
+
+<!-- Confirm modal -->
+<div id="confirmModal" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-icon">!</div>
+    <div class="modal-title" id="modalTitle">Are you sure?</div>
+    <div class="modal-text" id="modalText"></div>
+    <div class="modal-actions">
+      <button id="modalCancel" class="btn-cancel">CANCEL</button>
+      <button id="modalConfirm" class="btn-confirm">CONFIRM</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+<div class="sr-only" aria-live="polite" id="live"></div>
+<div class="print-area" id="printArea"></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+/* ================================================================
+   0. UTILITIES
+   ================================================================ */
+const $ = id => document.getElementById(id);
+const clamp = (v,a,b) => v<a?a:v>b?b:v;
+const rnd = (a,b) => a + Math.random()*(b-a);
+const pad2 = v => String(v).padStart(2,'0');
+const pad4 = v => String(v).padStart(4,'0');
+const DEG = Math.PI/180;
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+let RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', e => RM = e.matches);
+const store = {
+  get(k,d){ try{ const v=localStorage.getItem(k); return v===null?d:JSON.parse(v);}catch(e){return d;} },
+  set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+};
+
+/* ================================================================
+   1. THE BRAIN — RandomEngine (crypto, rejection sampled) + AuditEngine (SHA-256)
+   These are the preserved functional core. Nothing in the visual layer
+   is ever allowed to call into the selection path.
+   ================================================================ */
+const RandomEngine = {
+  // Uniform integer in [min,max] via rejection sampling on a uint32 draw.
+  int(min, max){
+    const range = max - min + 1;
+    const limit = Math.floor(0x100000000 / range) * range; // no modulo bias
+    const buf = new Uint32Array(1);
+    let r, tries = 0;
+    do { crypto.getRandomValues(buf); r = buf[0]; tries++; } while (r >= limit);
+    return { value: min + (r % range), raw: r, tries };
+  },
+  // AUTHORITATIVE selection for a decision with n choices.
+  pick(n){
+    const res = this.int(0, n-1);
+    return { index: res.value, rawHex: '0x' + res.raw.toString(16).padStart(8,'0'), tries: res.tries };
+  },
+  hex(nBytes){
+    const a = crypto.getRandomValues(new Uint8Array(nBytes));
+    return '0x' + [...a].map(b=>b.toString(16).padStart(2,'0')).join('');
+  }
+};
+
+// Synchronous SHA-256 fallback (used only if crypto.subtle is unavailable).
+function sha256Sync(str){
+  const K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+  const rr=(v,n)=>(v>>>n)|(v<<(32-n));
+  const utf8=unescape(encodeURIComponent(str));
+  const bytes=[]; for(let i=0;i<utf8.length;i++) bytes.push(utf8.charCodeAt(i));
+  const bitLen=bytes.length*8;
+  bytes.push(0x80); while(bytes.length%64!==56) bytes.push(0);
+  for(let i=7;i>=0;i--) bytes.push(Math.floor(bitLen/(2**(8*i)))&0xff);
+  let h0=0x6a09e667,h1=0xbb67ae85,h2=0x3c6ef372,h3=0xa54ff53a,h4=0x510e527f,h5=0x9b05688c,h6=0x1f83d9ab,h7=0x5be0cd19;
+  const w=new Array(64);
+  for(let off=0;off<bytes.length;off+=64){
+    for(let i=0;i<16;i++) w[i]=(bytes[off+4*i]<<24)|(bytes[off+4*i+1]<<16)|(bytes[off+4*i+2]<<8)|bytes[off+4*i+3];
+    for(let i=16;i<64;i++){
+      const s0=rr(w[i-15],7)^rr(w[i-15],18)^(w[i-15]>>>3);
+      const s1=rr(w[i-2],17)^rr(w[i-2],19)^(w[i-2]>>>10);
+      w[i]=(w[i-16]+s0+w[i-7]+s1)|0;
+    }
+    let a=h0,b=h1,c=h2,d=h3,e=h4,f=h5,g=h6,hh=h7;
+    for(let i=0;i<64;i++){
+      const S1=rr(e,6)^rr(e,11)^rr(e,25), ch=(e&f)^(~e&g);
+      const t1=(hh+S1+ch+K[i]+w[i])|0;
+      const S0=rr(a,2)^rr(a,13)^rr(a,22), mj=(a&b)^(a&c)^(b&c);
+      const t2=(S0+mj)|0;
+      hh=g;g=f;f=e;e=(d+t1)|0;d=c;c=b;b=a;a=(t1+t2)|0;
+    }
+    h0=(h0+a)|0;h1=(h1+b)|0;h2=(h2+c)|0;h3=(h3+d)|0;h4=(h4+e)|0;h5=(h5+f)|0;h6=(h6+g)|0;h7=(h7+hh)|0;
+  }
+  return [h0,h1,h2,h3,h4,h5,h6,h7].map(x=>(x>>>0).toString(16).padStart(8,'0')).join('');
+}
+
+const AuditEngine = {
+  decisionId(){
+    const ds = new Date().toISOString().slice(0,10).replace(/-/g,'');
+    return `DICE-${ds}-${RandomEngine.hex(3).slice(2,8).toUpperCase()}`;
+  },
+  // Canonical record: sorted keys, deterministic JSON. Hashed with SHA-256.
+  canonical(rec){
+    const o = {
+      category: rec.category, choices: rec.choices, decisionId: rec.id,
+      mode: rec.mode, rawEntropy: rec.raw, resultIndex: rec.selectedIndex,
+      timestamp: rec.ts, title: rec.title
+    };
+    return JSON.stringify(o);
+  },
+  async sha256Hex(str){
+    if (crypto?.subtle){
+      try{
+        const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+        return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
+      }catch(e){ /* fall through */ }
+    }
+    return sha256Sync(str);
+  }
+};
+
+/* ================================================================
+   2. SOUND + HAPTICS — pure presentation, retimed around the physical
+   sequence (launch / impact / bounce / settle / reveal). Never coupled
+   to decision logic.
+   ================================================================ */
+const Sound = {
+  ctx:null, master:null, noiseBuf:null,
+  enabled: store.get('dice2-muted', false) === false,
+  ensure(){
+    if(!this.enabled || this.ctx) return;
+    try{
+      const Ctx = window.AudioContext || window.webkitAudioContext; if(!Ctx) return;
+      this.ctx = new Ctx();
+      this.master = this.ctx.createGain(); this.master.gain.value = .5;
+      this.master.connect(this.ctx.destination);
+      this.noiseBuf = this.ctx.createBuffer(1, this.ctx.sampleRate*.12, this.ctx.sampleRate);
+      const d = this.noiseBuf.getChannelData(0);
+      for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+    }catch(e){}
+  },
+  resume(){ this.ensure(); if(this.ctx && this.ctx.state==='suspended') this.ctx.resume().catch(()=>{}); },
+  ok(){ return this.enabled && this.ctx && this.ctx.state==='running'; },
+  knock(v){
+    if(!this.ok()) return; const t=this.ctx.currentTime;
+    const o=this.ctx.createOscillator(); o.type='sine';
+    o.frequency.setValueAtTime(150+v*90,t);
+    o.frequency.exponentialRampToValueAtTime(52,t+.1);
+    const g=this.ctx.createGain(); g.gain.setValueAtTime(Math.max(.02,v*.5),t);
+    g.gain.exponentialRampToValueAtTime(.0008,t+.13);
+    o.connect(g); g.connect(this.master); o.start(t); o.stop(t+.15);
+    const s=this.ctx.createBufferSource(); s.buffer=this.noiseBuf;
+    const bp=this.ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=700+v*900; bp.Q.value=1;
+    const g2=this.ctx.createGain(); g2.gain.setValueAtTime(v*.28,t);
+    g2.gain.exponentialRampToValueAtTime(.0008,t+.05);
+    s.connect(bp); bp.connect(g2); g2.connect(this.master); s.start(t); s.stop(t+.07);
+  },
+  whoosh(){
+    if(!this.ok() || RM) return; const t=this.ctx.currentTime;
+    const s=this.ctx.createBufferSource(); s.buffer=this.noiseBuf; s.loop=true;
+    const lp=this.ctx.createBiquadFilter(); lp.type='lowpass';
+    lp.frequency.setValueAtTime(240,t); lp.frequency.exponentialRampToValueAtTime(1500,t+.28);
+    const g=this.ctx.createGain(); g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(.09,t+.12); g.gain.exponentialRampToValueAtTime(.0008,t+.32);
+    s.connect(lp); lp.connect(g); g.connect(this.master); s.start(t); s.stop(t+.34);
+  },
+  chime(){
+    if(!this.ok()) return; const t=this.ctx.currentTime;
+    [[660,0],[990,.13]].forEach(([f,d])=>{
+      const o=this.ctx.createOscillator(); o.type='sine'; o.frequency.value=f;
+      const g=this.ctx.createGain(); g.gain.setValueAtTime(.0001,t+d);
+      g.gain.exponentialRampToValueAtTime(.12,t+d+.02);
+      g.gain.exponentialRampToValueAtTime(.0008,t+d+.5);
+      o.connect(g); g.connect(this.master); o.start(t+d); o.stop(t+d+.55);
+    });
+  }
+};
+const Haptics = {
+  enabled: Sound.enabled,
+  bump(){ if(this.enabled && navigator.vibrate) navigator.vibrate(14); },
+  impact(v){ if(this.enabled && navigator.vibrate) navigator.vibrate(Math.round(8+v*18)); },
+  reveal(){ if(this.enabled && navigator.vibrate) navigator.vibrate([14,70,26]); }
+};
+
+/* ================================================================
+   3. ZERO-MISMATCH ORIENTATION CORE (Three.js)
+   Crypto RNG → Result Locked → Dice Visualizes Result.
+   The tumble is pure show; the settle resolves to the EXACT quaternion
+   of the locked face; the top face is then re-read from the rendered
+   orientation and independently verified.
+   ================================================================ */
+const UP  = new THREE.Vector3(0,1,0);
+// Face normals in die-local space. Opposite faces sum to 7 (1-6, 2-5, 3-4).
+const FNL = {
+  1:new THREE.Vector3(0,0,1),  6:new THREE.Vector3(0,0,-1),
+  2:new THREE.Vector3(1,0,0),  5:new THREE.Vector3(-1,0,0),
+  3:new THREE.Vector3(0,1,0),  4:new THREE.Vector3(0,-1,0)
+};
+// Base orientation that brings face v's normal to world up (+Y).
+const BASE_Q = {};
+for(let v=1;v<=6;v++) BASE_Q[v] = new THREE.Quaternion().setFromUnitVectors(FNL[v], UP);
+// Pip layout on a 3×3 grid (indices 0..8), shared with the physical die build.
+const PIPS = {1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
+// In-plane tangents per face (used for pip placement + geometric verification).
+const TANG = {};
+for(let v=1;v<=6;v++){
+  const n=FNL[v], ref=Math.abs(n.y)>.9?new THREE.Vector3(1,0,0):new THREE.Vector3(0,1,0);
+  const u=new THREE.Vector3().crossVectors(ref,n).normalize();
+  const w=new THREE.Vector3().crossVectors(n,u).normalize();
+  TANG[v]={u,w,quat:new THREE.Quaternion().setFromUnitVectors(UP,n)};
+}
+const CORNER_SIGNS=[[-1,-1,-1],[1,-1,-1],[-1,1,-1],[1,1,-1],[-1,-1,1],[1,-1,1],[-1,1,1],[1,1,1]];
+
+const _vA=new THREE.Vector3(), _vB=new THREE.Vector3();
+const _qA=new THREE.Quaternion(), _qB=new THREE.Quaternion();
+
+// Which face is ACTUALLY on top right now — read from the live orientation.
+function topFace(q){
+  let best=-2, v=1;
+  for(let f=1;f<=6;f++){
+    _vA.copy(FNL[f]).applyQuaternion(q);
+    if(_vA.y>best){ best=_vA.y; v=f; }
+  }
+  return v;
+}
+// Lowest-corner clearance: keeps the body physically above the table.
+function hMin(q, size){
+  let m=-1e9;
+  for(const [sx,sy,sz] of CORNER_SIGNS){
+    _vA.set(sx*.5, sy*.5, sz*.5).applyQuaternion(q);
+    if(-_vA.y>m) m=-_vA.y;
+  }
+  return m*size;
+}
+// Exact target orientation for face v: nearest of 4 in-plane quadrants
+// (±jitter about the up axis — face v stays on top for ANY in-plane angle).
+function targetQ(v, cur, jitter=9){
+  let best=null, bestA=Infinity;
+  for(let k=0;k<4;k++){
+    const s=(k*90+(Math.random()*2-1)*jitter)*DEG;
+    _qA.setFromAxisAngle(UP,s);
+    _qB.copy(_qA).multiply(BASE_Q[v]);   // world-up spin applied AFTER base
+    const a=_qB.angleTo(cur);
+    if(a<bestA){ bestA=a; best=_qB.clone(); }
+  }
+  return best;
+}
+// selectedIndex → base-6 digits → per-die target faces (multi-D6 semantics preserved).
+function targetsFor(selectedIndex, diceCount){
+  if(diceCount===1) return [selectedIndex+1];
+  const t=[]; let r=selectedIndex;
+  for(let i=diceCount-1;i>=0;i--){ t[i]=(r%6)+1; r=Math.floor(r/6); }
+  return t;
+}
+function indexFromTargets(t){ return t.reduce((a,v)=>a*6+(v-1),0); }
+function diceCountFor(n){ n=clamp(n||1,1,36); return n<=6?1:2; }
+
+/* ---------------- physics: shared by live dice AND audit sims ------------- */
+const G = 26;
+const easeBack = t => { const c=1.2, u=t-1; return 1+(c+1)*u*u*u+c*u*u; };
+
+function stepAirState(s, dt, now, fx){
+  s.vel.y -= G*dt;
+  s.pos.addScaledVector(s.vel, dt);
+  s.pos.x = clamp(s.pos.x, -s.bx, s.bx);
+  s.pos.z = clamp(s.pos.z, -s.bz, s.bz);
+  const wm = s.w.length();
+  if(wm>1e-4){
+    _vA.copy(s.w).multiplyScalar(1/wm);
+    _qA.setFromAxisAngle(_vA, wm*dt);
+    s.q.premultiply(_qA).normalize();
+  }
+  s.w.multiplyScalar(Math.exp(-0.85*dt));
+  const floor = hMin(s.q, s.size);
+  if(s.pos.y <= floor){
+    s.pos.y = floor;
+    const imp = Math.abs(s.vel.y);
+    if(imp > 2.4 && s.bounces < 4){
+      s.vel.y = -s.vel.y*(0.34+Math.random()*0.12);
+      s.w.set(s.w.x*.55+rnd(-.6,.6), s.w.y*.55+rnd(-.6,.6), s.w.z*.55+rnd(-.6,.6));
+      s.vel.x*=.55; s.vel.z*=.55; s.bounces++;
+      fx?.bounce?.(Math.min(1, imp/13));
+    }else{
+      s.vel.set(0,0,0);
+      beginSettleState(s, now, fx);
+    }
+  }
+  if(s.mode==='air' && now - s.t0 > 3600){
+    s.pos.y = Math.max(s.pos.y, hMin(s.q, s.size));
+    beginSettleState(s, now, fx);
+  }
+}
+function beginSettleState(s, now, fx){
+  s.qT = targetQ(s.target, s.q);
+  _qA.copy(s.qT).multiply(_qB.copy(s.q).invert());
+  if(_qA.w < 0){ _qA.x*=-1; _qA.y*=-1; _qA.z*=-1; _qA.w*=-1; }
+  const l = Math.hypot(_qA.x,_qA.y,_qA.z);
+  s.sAxis = l>1e-6 ? new THREE.Vector3(_qA.x/l,_qA.y/l,_qA.z/l) : new THREE.Vector3(1,0,0);
+  s.sAng  = 2*Math.atan2(l,_qA.w);
+  s.sQ0   = s.q.clone(); s.y0 = s.pos.y; s.sT0 = now;
+  s.sDur  = clamp(420 + (s.sAng*180/Math.PI)*2.1, 420, 830) * (RM?.55:1) * (s.quick?.6:1);
+  s.mode='settle'; s.w.set(0,0,0);
+  fx?.settle?.();
+}
+function stepSettleState(s, now, fx){
+  const k = clamp((now - s.sT0)/s.sDur, 0, 1);
+  _qA.setFromAxisAngle(s.sAxis, s.sAng*easeBack(k));
+  s.q.copy(s.sQ0).premultiply(_qA);
+  const ec = 1-Math.pow(1-k,3);
+  s.pos.y = s.y0 + (s.H - s.y0)*ec;
+  if(k>=1){
+    s.q.copy(s.qT);       // ends EXACTLY on the target orientation
+    s.pos.y = s.H;
+    s.mode = 'done';
+    fx?.land?.(s);
+  }
+}
+
+/* ================================================================
+   4. THREE.JS STAGE — one renderer, themed, mobile-first
+   ================================================================ */
+const SKINS = {
+  dark:{ body:0x1a1712, pip:0xeee6cf, pipEm:0x000000, pipEmI:0, rough:.34,
+         key:{c:0xfff1dc,i:1.25}, rim:{c:0xf59e0b,i:.5}, hemi:{sky:0xfff8ec,ground:0x0c0b09,i:.65},
+         grid:0x5c5546, gridOp:.17, ring:0x8a8275, fog:0x0c0b09, shadow:.5 },
+  light:{ body:0xf7f0dd, pip:0x241d13, pipEm:0x000000, pipEmI:0, rough:.42,
+         key:{c:0xffffff,i:1.0}, rim:{c:0xc2410c,i:.35}, hemi:{sky:0xffffff,ground:0xf3ecdc,i:.85},
+         grid:0x8b8272, gridOp:.2, ring:0x6b6358, fog:0xf3ecdc, shadow:.3 },
+  cyber:{ body:0x061410, pip:0x4eff96, pipEm:0x2aff8a, pipEmI:.7, rough:.3,
+         key:{c:0xd7fff0,i:1.0}, rim:{c:0xffea00,i:.65}, hemi:{sky:0x9fffdd,ground:0x02060a,i:.5},
+         grid:0x1d6b4c, gridOp:.26, ring:0x2a8a5e, fog:0x02060a, shadow:.55 }
+};
+let skin = SKINS.dark;
+
+const stageEl = $('stage');
+const canvas = $('stageCanvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
+renderer.setClearColor(0x000000, 0);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x0c0b09, 14, 34);
+
+const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+const CAM_TARGET = new THREE.Vector3(0, 1.05, 0);
+const hemi = new THREE.HemisphereLight(0xfff8ec, 0x0c0b09, .65);
+const key  = new THREE.DirectionalLight(0xfff1dc, 1.25); key.position.set(4, 7, 5);
+const rim  = new THREE.DirectionalLight(0xf59e0b, .5);   rim.position.set(-5, 3, -6);
+scene.add(hemi, key, rim);
+
+let gridHelper = null, ringLine = null;
+const diceGroup = new THREE.Group();
+const shadowGroup = new THREE.Group();
+scene.add(diceGroup, shadowGroup);
+
+function buildTableDress(){
+  if(gridHelper){ scene.remove(gridHelper); gridHelper.geometry.dispose(); gridHelper.material.dispose(); }
+  if(ringLine){ scene.remove(ringLine); ringLine.geometry.dispose(); ringLine.material.dispose(); }
+  gridHelper = new THREE.GridHelper(36, 36, skin.grid, skin.grid);
+  gridHelper.material.transparent = true;
+  gridHelper.material.opacity = skin.gridOp;
+  gridHelper.material.vertexColors = false;
+  gridHelper.material.color.set(skin.grid);
+  gridHelper.material.needsUpdate = true;
+  scene.add(gridHelper);
+  const pts=[];
+  for(let i=0;i<=96;i++){ const a=i/96*Math.PI*2; pts.push(new THREE.Vector3(Math.cos(a)*3.6, 0.01, Math.sin(a)*3.6)); }
+  ringLine = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color:skin.ring, transparent:true, opacity:.3 })
+  );
+  scene.add(ringLine);
+}
+
+/* --------- The ONE physical die definition used everywhere --------- */
+// Square-edged precision cube, real 3D pip geometry, unit-cube construction
+// (every die on screen and in the audit shares these exact assets).
+const dieAssets = (() => {
+  const bodyGeo = new RoundedBoxGeometry(1, 1, 1, 3, 0.045); // subtle edge only
+  const tmpl = new THREE.CylinderGeometry(0.08, 0.08, 0.06, 22, 1, false);
+  const parts = [];
+  const M = new THREE.Matrix4();
+  for(let v=1; v<=6; v++){
+    const {u,w,quat} = TANG[v], n = FNL[v];
+    for(const idx of PIPS[v]){
+      const a=(idx%3)-1, b=Math.floor(idx/3)-1;
+      const g = tmpl.clone();
+      _vB.copy(n).multiplyScalar(0.474)            // flush cap, hair above the face plane
+           .addScaledVector(u, a*0.27).addScaledVector(w, b*0.27);
+      M.compose(_vB, quat, new THREE.Vector3(1,1,1));
+      g.applyMatrix4(M);
+      parts.push(g);
+    }
+  }
+  const pipGeo = mergeGeometries(parts);
+  parts.forEach(g=>g.dispose());
+  tmpl.dispose();
+  const sc = document.createElement('canvas'); sc.width=sc.height=128;
+  const c2 = sc.getContext('2d');
+  const grad = c2.createRadialGradient(64,64,4,64,64,62);
+  grad.addColorStop(0,'rgba(0,0,0,1)'); grad.addColorStop(1,'rgba(0,0,0,0)');
+  c2.fillStyle=grad; c2.fillRect(0,0,128,128);
+  const shadowTex = new THREE.CanvasTexture(sc);
+  const shadowGeo = new THREE.PlaneGeometry(1,1);
+  return { bodyGeo, pipGeo, shadowTex, shadowGeo };
+})();
+const dieMats = {
+  body:   new THREE.MeshStandardMaterial({ color:SKINS.dark.body, roughness:.34, metalness:.06 }),
+  pips:   new THREE.MeshStandardMaterial({ color:SKINS.dark.pip, roughness:.5, metalness:.05, emissive:0x000000, emissiveIntensity:0 }),
+  shadow: new THREE.MeshBasicMaterial({ map:dieAssets.shadowTex, transparent:true, depthWrite:false, opacity:.3 })
+};
+// Published standard so the homepage demo renders the SAME physical object.
+window.__DICE_DIE_STANDARD__ = {
+  geometry:'RoundedBox 1×1×1 r=0.045 seg=3', pipRadius:0.08, pipSpacing:0.27,
+  faceNormals:FNL, baseQuaternions:BASE_Q, pipMap:PIPS, mapping:'deterministic-result-to-orientation'
+};
+
+function applySkin3D(name){
+  skin = SKINS[name] || SKINS.dark;
+  dieMats.body.color.set(skin.body); dieMats.body.roughness = skin.rough;
+  dieMats.pips.color.set(skin.pip);
+  dieMats.pips.emissive.set(skin.pipEm); dieMats.pips.emissiveIntensity = skin.pipEmI;
+  hemi.color.set(skin.hemi.sky); hemi.groundColor.set(skin.hemi.ground); hemi.intensity = skin.hemi.i;
+  key.color.set(skin.key.c); key.intensity = skin.key.i;
+  rim.color.set(skin.rim.c); rim.intensity = skin.rim.i;
+  scene.fog.color.set(skin.fog);
+  buildTableDress();
+}
+
+/* ------------------------------ dice ------------------------------ */
+const dice = [];
+let castActive = false, castFinalize = null;
+
+function ensureDice(count){
+  count = clamp(count, 1, 2);
+  if(dice.length === count) return;
+  // Teardown: shared geometries/textures persist; per-die cloned materials are disposed.
+  for(const d of dice){
+    diceGroup.remove(d.group);
+    shadowGroup.remove(d.shadow);
+    d.shadow.material.dispose();
+  }
+  dice.length = 0;
+  const size = count===1 ? 1.7 : 1.22;
+  for(let i=0;i<count;i++){
+    const group = new THREE.Group();
+    group.add(new THREE.Mesh(dieAssets.bodyGeo, dieMats.body));
+    group.add(new THREE.Mesh(dieAssets.pipGeo, dieMats.pips));
+    group.scale.setScalar(size);
+    const slot = (i-(count-1)/2);
+    group.position.set(slot*size*2.05, size/2+0.18, 0);
+    const shadow = new THREE.Mesh(dieAssets.shadowGeo, dieMats.shadow.clone());
+    shadow.rotation.x = -Math.PI/2;
+    shadow.position.y = 0.012;
+    diceGroup.add(group); shadowGroup.add(shadow);
+    dice.push({
+      group, shadow, size, H:size/2,
+      pos:group.position, q:group.quaternion,      // physics writes the mesh directly
+      vel:new THREE.Vector3(), w:new THREE.Vector3(),
+      mode:'idle', bounces:0, t0:0, target:1, qT:null, quick:false,
+      seed:Math.random()*10,
+      idleAxis:new THREE.Vector3(rnd(-.4,.4),1,rnd(-.4,.4)).normalize(),
+      bx:count===1?1.6:2.8, bz:1.4
+    });
+  }
+}
+function idleStep(d, dt, t){
+  _qA.setFromAxisAngle(d.idleAxis, .4*dt);
+  d.q.premultiply(_qA).normalize();
+  d.pos.y = d.H + .18 + Math.sin(t*.0011 + d.seed)*.05;
+  d.pos.z = Math.sin(t*.0007 + d.seed*3)*.15;
+}
+
+/* --------------------------- camera (visual only) --------------------------- */
+const VIEWS = [
+  { r:11.4, phi:1.26, theta:0.00 },  // 01 PERSPECTIVE
+  { r:11.6, phi:0.07, theta:0.00 },  // 02 TOP-DOWN
+  { r:10.4, phi:1.47, theta:0.55 }   // 03 TABLE-LEVEL
+];
+const cam  = { r:12.5, phi:1.35, theta:.4 };
+const camT = { ...VIEWS[0] };
+function setView(i){
+  document.querySelectorAll('.view-btn').forEach((b,j)=>b.classList.toggle('active', j===i));
+  if(i<0) return;
+  let dT = (VIEWS[i].theta - camT.theta);
+  camT.r = VIEWS[i].r; camT.phi = VIEWS[i].phi; camT.theta += dT;
+}
+document.querySelectorAll('.view-btn').forEach(b=>
+  b.addEventListener('click', ()=>setView(+b.dataset.view)));
+
+let dragging=false, dragDist=0, dragT0=0, px=0, py=0;
+canvas.addEventListener('pointerdown', e=>{
+  Sound.resume();
+  dragging=true; dragDist=0; dragT0=performance.now(); px=e.clientX; py=e.clientY;
+  canvas.setPointerCapture(e.pointerId); canvas.classList.add('dragging');
+});
+canvas.addEventListener('pointermove', e=>{
+  if(!dragging) return;
+  const dx=e.clientX-px, dy=e.clientY-py; px=e.clientX; py=e.clientY;
+  dragDist+=Math.hypot(dx,dy);
+  camT.theta -= dx*.005;
+  camT.phi = clamp(camT.phi + dy*.004, .08, 1.52);
+  document.querySelectorAll('.view-btn').forEach(b=>b.classList.remove('active'));
+});
+canvas.addEventListener('pointerup', ()=>{ dragging=false; canvas.classList.remove('dragging'); });
+canvas.addEventListener('pointercancel', ()=>{ dragging=false; canvas.classList.remove('dragging'); });
+canvas.addEventListener('wheel', e=>{
+  e.preventDefault();
+  camT.r = clamp(camT.r*(e.deltaY<0?1.08:0.93), 6, 17);
+},{passive:false});
+
+function resize(){
+  const w = stageEl.clientWidth, h = stageEl.clientHeight;
+  if(!w||!h) return;
+  renderer.setSize(w, h, false);
+  camera.aspect = w/h;
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stageEl);
+addEventListener('resize', resize);
+
+function updateCamera(dt){
+  const k = 1-Math.exp(-dt*6);
+  cam.r+=(camT.r-cam.r)*k; cam.phi+=(camT.phi-cam.phi)*k; cam.theta+=(camT.theta-cam.theta)*k;
+  const vs = camera.aspect<1 ? clamp(1/camera.aspect,1,1.9) : 1;
+  const r = cam.r*vs;
+  camera.position.set(
+    CAM_TARGET.x + r*Math.sin(cam.phi)*Math.sin(cam.theta),
+    CAM_TARGET.y + r*Math.cos(cam.phi),
+    CAM_TARGET.z + r*Math.sin(cam.phi)*Math.cos(cam.theta)
+  );
+  camera.lookAt(CAM_TARGET);
+}
+
+/* ------------------------------ cast ------------------------------ */
+const liveFx = {
+  bounce: v => { Sound.knock(v); Haptics.impact(v); },
+  settle: () => Sound.knock(.22),
+  land:   () => {}
+};
+function castDice(targetValues, opts={}){
+  return new Promise(resolve=>{
+    ensureDice(targetValues.length);
+    const now = performance.now();
+    const quick = !!opts.quick;
+    dice.forEach((d,i)=>{
+      d.target=targetValues[i]; d.bounces=0; d.t0=now; d.mode='air'; d.quick=quick;
+      const slot=(i-(targetValues.length-1)/2);
+      d.pos.set(slot*d.size*.5, d.H+.02, rnd(-.35,.35));
+      const slotX = slot*(d.size*2.05);
+      d.vel.set((slotX-d.pos.x)*rnd(1.3,1.8)+rnd(-.4,.4), (quick||RM)?6.8:13.6+Math.random()*2.6, rnd(-.6,.6));
+      const wm=(quick||RM)?6.5:rnd(10,16);
+      d.w.set(rnd(-1,1),rnd(-.5,.5),rnd(-1,1)).normalize().multiplyScalar(wm);
+    });
+    flickReset();
+    castActive = true;
+    castFinalize = ()=>{
+      let residual = 0;
+      for(const d of dice) if(d.qT) residual = Math.max(residual, d.q.angleTo(d.qT)*180/Math.PI);
+      resolve({
+        faces: dice.map(d=>topFace(d.q)),      // read from the ACTUAL rendered orientation
+        residual
+      });
+    };
+  });
+}
+
+/* --------------------------- render loop --------------------------- */
+let lastT=performance.now(), lastTele=0, lastFl=0, flInt=60, rollN=6, flickOn=false;
+const bigNum=$('bigNum');
+function flickReset(){ flickOn=true; flInt=60; lastFl=0; if(!RM) bigNum.textContent='—'; }
+
+function frame(t){
+  const dt = Math.min(.033,(t-lastT)/1000)||.016; lastT=t;
+  for(const d of dice){
+    if(d.mode==='idle') idleStep(d, dt, t);
+    else if(d.mode==='air')  stepAirState(d, dt, t, liveFx);
+    else if(d.mode==='settle') stepSettleState(d, t, liveFx);
+    // fake contact shadow
+    d.shadow.position.x=d.pos.x; d.shadow.position.z=d.pos.z;
+    const rel=clamp((d.pos.y-d.H)/3.2,0,1);
+    d.shadow.scale.setScalar(d.size*2.2*(1+rel*.45));
+    d.shadow.material.opacity = skin.shadow*.55*(1-rel*.62);
+  }
+  if(castActive && dice.every(d=>d.mode==='done')){
+    castActive=false;
+    const f=castFinalize; castFinalize=null; f && f();
+  }
+  if(flickOn && !RM && t-lastFl>flInt){
+    lastFl=t; flInt=Math.min(220,flInt*1.1);
+    bigNum.textContent = String(1+(Math.random()*rollN|0));
+  }
+  updateCamera(dt);
+  renderer.render(scene, camera);
+  if(t-lastTele>100){ lastTele=t; teleUpdate(); }
+  requestAnimationFrame(frame);
+}
+
+/* --------------------------- telemetry --------------------------- */
+const ledger = { rolls:0, matched:0, miss:0, dist:[0,0,0,0,0,0,0] };
+const distBars=[];
+(function buildDist(){
+  const wrap=$('dist');
+  for(let v=1;v<=6;v++){
+    const col=document.createElement('div'); col.className='dist-col';
+    const bar=document.createElement('div'); bar.className='dist-bar';
+    const n=document.createElement('div'); n.className='dist-n'; n.textContent=v;
+    col.append(bar,n); wrap.appendChild(col); distBars.push(bar);
+  }
+})();
+function teleUpdate(){
+  $('tFace').textContent = dice.length ? dice.map(d=>pad2(topFace(d.q))).join(' ') : '—';
+  $('tState').textContent = app.phase.toUpperCase();
+  let av=0, alt=0, err='—';
+  for(const d of dice){
+    av=Math.max(av, d.mode==='air'?d.w.length():0);
+    alt=Math.max(alt, d.pos.y-d.H);
+    if(d.qT && d.mode!=='air') err=(d.q.angleTo(d.qT)*180/Math.PI).toFixed(2)+'°';
+  }
+  $('tVel').textContent=av.toFixed(1)+' rad/s';
+  $('tAlt').textContent=Math.max(0,alt).toFixed(2)+' u';
+  $('tErr').textContent=err;
+}
+function ledgerUpdate(){
+  $('lRolls').textContent=pad4(ledger.rolls);
+  $('lMatch').textContent=pad4(ledger.matched);
+  $('lMiss').textContent =pad4(ledger.miss);
+  const mx=Math.max(1,...ledger.dist.slice(1));
+  for(let v=1;v<=6;v++) distBars[v-1].style.height=(ledger.dist[v]===0?2:4+ledger.dist[v]/mx*36)+'px';
+}
+
+/* ================================================================
+   5. AUDIT SUITE — controlled-target verification against actual geometry
+   For each face 1–6: 100 fast-forward rolls through the REAL physics +
+   settle path, each independently confirmed by (a) reading the final
+   quaternion's top face, (b) a downward raycast against the rendered
+   cube geometry, (c) counting the actual pips on the top face.
+   Plus multi-D6 reconstruction tests and 6 live rendered rolls.
+   ================================================================ */
+const scratch = (()=>{
+  const g=new THREE.Group();
+  const body=new THREE.Mesh(dieAssets.bodyGeo, dieMats.body);
+  const pips=new THREE.Mesh(dieAssets.pipGeo, dieMats.pips);
+  g.add(body,pips); g.scale.setScalar(1.7);
+  return { g, body, pips };
+})();
+const ray = new THREE.Raycaster();
+ray.far = 50;
+function geomChecks(q){
+  // Independent geometric confirmation via raycast against the actual meshes.
+  scratch.g.quaternion.copy(q);
+  scratch.g.position.set(0, .85, 0);
+  scratch.g.updateMatrixWorld(true);
+  ray.set(new THREE.Vector3(0, 8, 0), new THREE.Vector3(0,-1,0));
+  const hitBody = ray.intersectObject(scratch.body, false)[0];
+  if(!hitBody) return { face:null, pips:null };
+  const p = scratch.body.worldToLocal(hitBody.point.clone());
+  const ax=Math.abs(p.x), ay=Math.abs(p.y), az=Math.abs(p.z);
+  let f;
+  if(ay>=ax&&ay>=az) f=p.y>0?3:4;
+  else if(ax>=az)    f=p.x>0?2:5;
+  else               f=p.z>0?1:6;
+  // count distinct pips lying on the top plane of that face
+  const {u,w}=TANG[f], n=FNL[f], seen=new Set();
+  for(const h of ray.intersectObject(scratch.pips, false)){
+    const lp=scratch.pips.worldToLocal(h.point.clone());
+    if(Math.abs(lp.dot(n)-0.474)<0.08){
+      seen.add(Math.round(lp.dot(u)*40)+'_'+Math.round(lp.dot(w)*40));
+    }
+  }
+  return { face:f, pips:seen.size };
+}
+function randQuat(){
+  return new THREE.Quaternion().setFromAxisAngle(
+    new THREE.Vector3(rnd(-1,1),rnd(-1,1),rnd(-1,1)).normalize(), rnd(0,Math.PI*2));
+}
+function simState(target){
+  const size=1.7;
+  return {
+    size, H:size/2, pos:new THREE.Vector3(rnd(-.6,.6), size/2, rnd(-.4,.4)),
+    q:randQuat(), vel:new THREE.Vector3(rnd(-2.5,2.5), rnd(11,15), rnd(-1,1)),
+    w:new THREE.Vector3(rnd(-1,1),rnd(-.6,.6),rnd(-1,1)).normalize().multiplyScalar(rnd(10,17)),
+    mode:'air', bounces:0, t0:0, target, bx:1.6, bz:1.4, quick:true, qT:null
+  };
+}
+function fastRollSim(target){
+  const s=simState(target);
+  let t=0, guard=0;
+  while(s.mode!=='done' && guard++<4000){
+    t+=16.7;
+    if(s.mode==='air') stepAirState(s, .0167, t, null);
+    else stepSettleState(s, t, null);
+  }
+  s.q.copy(s.qT||s.q); // ensure exact snap even if guard tripped
+  return s;
+}
+async function runAuditSuite(live){
+  const R = { face:{n:0,ok:0}, multi:{n:0,ok:0}, ray:{n:0,ok:0}, pip:{n:0,ok:0}, live:{n:0,ok:0}, worst:0, fails:[] };
+  const yieldEvery = ()=>new Promise(r=>setTimeout(r,0));
+  const total = 600+120+(live?6:0);
+  let done=0;
+  const prog = ()=>{ $('suiteLine').textContent=`RUNNING ${done}/${total}`; };
+  prog();
+  // Phase 1 — 100 controlled rolls per face, 1–6.
+  for(let f=1; f<=6; f++){
+    for(let i=0;i<100;i++){
+      const s=fastRollSim(f);
+      const shown=topFace(s.q);
+      R.face.n++;
+      if(shown===f && s.qT && s.q.angleTo(s.qT)<1e-6) R.face.ok++;
+      else R.fails.push(`FACE ${f} → ${shown}`);
+      R.worst=Math.max(R.worst, s.q.angleTo(s.qT||s.q)*180/Math.PI);
+      const g=geomChecks(s.q);
+      R.ray.n++; if(g.face===f) R.ray.ok++; else R.fails.push(`RAY ${f} → ${g.face}`);
+      R.pip.n++; if(g.pips===PIPS[f].length) R.pip.ok++; else R.fails.push(`PIPS ${f} → ${g.pips}`);
+      done++; if(done%40===0){ prog(); await yieldEvery(); }
+    }
+  }
+  // Phase 2 — multi-D6 reconstruction across choice counts beyond 6.
+  for(const n of [2,6,7,12,20,35]){
+    for(let i=0;i<20;i++){
+      const forced=RandomEngine.pick(n).index;
+      const dc=diceCountFor(n);
+      const tv=targetsFor(forced,dc);
+      const faces=tv.map(v=>topFace(fastRollSim(v).q));
+      R.multi.n++;
+      if(indexFromTargets(faces)===forced && faces.every((f,j)=>f===tv[j])) R.multi.ok++;
+      else R.fails.push(`MULTI n=${n} idx=${forced} faces=[${faces}]`);
+      done++; if(done%20===0){ prog(); await yieldEvery(); }
+    }
+  }
+  // Phase 3 — live rendered rolls, one per face, through the real cast path.
+  if(live){
+    setPhase('AUDIT','LIVE VERIFICATION PASS');
+    for(let f=1; f<=6; f++){
+      const out=await castDice([f], {quick:true});
+      await sleep(160);
+      R.live.n++;
+      if(out.faces[0]===f) R.live.ok++;
+      else R.fails.push(`LIVE ${f} → ${out.faces[0]}`);
+      done++; prog();
+      await sleep(240);
+    }
+    setPhase('READY','AUDIT COMPLETE');
+  }
+  return R;
+}
+let suiteBusy=false;
+async function runSuite(){
+  if(suiteBusy || app.rolling) return;
+  suiteBusy=true;
+  $('suiteBtn').disabled=true; $('castBtn').disabled=true;
+  try{
+    const R=await runAuditSuite(true);
+    const pass = R.face.ok===R.face.n && R.multi.ok===R.multi.n && R.ray.ok===R.ray.n && R.pip.ok===R.pip.n && R.live.ok===R.live.n;
+    $('suiteLine').textContent = pass?'PASS':'FAIL';
+    $('suiteLine').className = pass?'ok':'bad';
+    $('suiteOut').innerHTML =
+      `<span class="${R.face.ok===R.face.n?'ok':'bad'}">FACE SUITE    ${R.face.ok}/${R.face.n}</span>\n`+
+      `<span class="${R.multi.ok===R.multi.n?'ok':'bad'}">MULTI-D6      ${R.multi.ok}/${R.multi.n}</span>\n`+
+      `<span class="${R.ray.ok===R.ray.n?'ok':'bad'}">RAY GEOMETRY  ${R.ray.ok}/${R.ray.n}</span>\n`+
+      `<span class="${R.pip.ok===R.pip.n?'ok':'bad'}">PIP COUNTS    ${R.pip.ok}/${R.pip.n}</span>\n`+
+      `<span class="${R.live.ok===R.live.n?'ok':'bad'}">LIVE ROLLS    ${R.live.ok}/${R.live.n}</span>\n`+
+      `MAX RESIDUAL  ${R.worst.toFixed(4)}°`;
+    if(pass){ toast(`SUITE PASS — ${R.face.n+R.multi.n+R.live.n} CONTROLLED ROLLS, ZERO MISMATCH`,'success'); }
+    else{ toast(`SUITE FAIL — ${R.fails.length} MISMATCHES RECORDED`,'error'); console.warn('suite fails',R.fails); }
+    // restore idle preview
+    ensureDice(diceCountFor(validChoices().length||1));
+    dice.forEach(d=>d.mode='idle');
+  } finally {
+    suiteBusy=false; $('suiteBtn').disabled=false; updateSetup();
+  }
+}
+ $('suiteBtn').addEventListener('click', runSuite);
+async function selfTest(){
+  const R=await runAuditSuite(false);
+  const n=R.face.n+R.multi.n, ok=R.face.ok+R.multi.ok;
+  const el=$('mapSelf');
+  el.textContent = ok===n ? `${ok}/${n} OK` : `${ok}/${n} FAIL`;
+  el.className = ok===n ? 'ok' : 'bad';
+  setStatus();
+}
+
+/* ================================================================
+   6. APP STATE + UI
+   ================================================================ */
+const app = {
+  phase:'ready', rolling:false,
+  title:'', mode:'people', category:'General Decision', blind:false,
+  choices:Array(6).fill(''),
+  choicesPeople:Array(6).fill(''),
+  choicesOptions:Array(2).fill(''),
+  lastDecision:null, selfTestOk:null
+};
+const history = store.get('dice2-history', []);
+
+function setStatus(){
+  const bits=[`ENGINE ${app.phase.toUpperCase()}`,'CRYPTO RNG OK'];
+  if(app.selfTestOk!==null) bits.push(`MAP ${app.selfTestOk}`);
+  $('statusLine').textContent = bits.join(' · ');
+}
+function announce(msg){ $('live').textContent = msg; }
+function setPhase(word, meta){
+  app.phase = word.toLowerCase();
+  $('phaseWord').textContent = word;
+  if(meta!==undefined) $('phaseMeta').textContent = meta;
+  setStatus();
+}
+function authority(text, show=true, bad=false){
+  const p=$('authorityPill');
+  $('authorityText').textContent=text;
+  p.classList.toggle('show', show);
+  p.classList.toggle('bad', bad);
+}
+function bigNumStamp(n){
+  bigNum.textContent=String(n);
+  bigNum.classList.remove('stamp'); void bigNum.offsetWidth;
+  bigNum.classList.add('stamp');
+}
+
+/* ------------------------------ toasts ------------------------------ */
+function toast(msg, type='info'){
+  const t=document.createElement('div');
+  t.className=`toast ${type}`; t.textContent=msg;
+  $('toastWrap').appendChild(t);
+  setTimeout(()=>{ t.classList.add('removing'); setTimeout(()=>t.remove(), 320); }, 3400);
+}
+
+/* ------------------------------ theme ------------------------------ */
+const themeBtns=document.querySelectorAll('.theme-btn');
+function setTheme(name){
+  document.documentElement.setAttribute('data-theme', name);
+  store.set('dice-theme', name);
+  themeBtns.forEach(b=>b.classList.toggle('active', b.dataset.theme===name));
+  applySkin3D(name);
+}
+themeBtns.forEach(b=>b.addEventListener('click', ()=>setTheme(b.dataset.theme)));
+
+/* ------------------------------ sound toggle ------------------------------ */
+function renderSound(){
+  const on=Sound.enabled;
+  $('soundToggle').classList.toggle('muted', !on);
+  $('soundToggle').setAttribute('aria-pressed', String(on));
+}
+ $('soundToggle').addEventListener('click', ()=>{
+  Sound.enabled=!Sound.enabled; Haptics.enabled=Sound.enabled;
+  store.set('dice2-muted', !Sound.enabled);
+  if(Sound.enabled) Sound.resume();
+  renderSound();
+});
+
+/* ------------------------------ setup form ------------------------------ */
+function validChoices(){ return app.choices.map(c=>c.trim()).filter(Boolean); }
+function defaultCountForMode(m){ return m==='people'?6:2; }
+function labelForMode(m, i){ return (m==='people'?'Person':'Option')+' '+(i+1); }
+function effectiveChoices(){
+  const trimmed = app.choices.map(c=>c.trim());
+  const filled = trimmed.filter(Boolean);
+  if(filled.length>=2) return trimmed.map((c,i)=> c || labelForMode(app.mode,i));
+  if(app.title.trim()){
+    return trimmed.map((c,i)=> c || labelForMode(app.mode,i));
+  }
+  return filled;
+}
+
+function fmtPct(n){ if(!n) return '—'; const p=100/n; return (p%1===0?p.toFixed(0):p.toFixed(2))+'%'; }
+
+function renderChoices(focusLast=false){
+  const list=$('choicesList');
+  list.innerHTML='';
+  const ph = app.mode==='people' ? 'Person' : 'Option';
+  app.choices.forEach((val,i)=>{
+    const row=document.createElement('div');
+    row.className='choice-row';
+    row.innerHTML=`<span class="choice-num">${pad2(i+1)}</span>
+      <input class="choice-input" data-i="${i}" value="" maxlength="80" placeholder="${ph} ${i+1}" />
+      <button class="choice-x" data-i="${i}" aria-label="Remove choice">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>`;
+    row.querySelector('input').value=val;
+    list.appendChild(row);
+  });
+  if(focusLast){ const inp=list.querySelector(`[data-i="${app.choices.length-1}"].choice-input`); inp&&inp.focus(); }
+}
+ $('choicesList').addEventListener('input', e=>{
+  const i=+e.target.dataset.i;
+  if(!Number.isNaN(i)){
+    app.choices[i]=e.target.value;
+    if(app.mode==='people') app.choicesPeople[i]=e.target.value;
+    else app.choicesOptions[i]=e.target.value;
+    updateSetup();
+  }
+});
+ $('choicesList').addEventListener('click', e=>{
+  const btn=e.target.closest('.choice-x'); if(!btn) return;
+  const i=+btn.dataset.i;
+  if(app.choices.length<=2){ toast('A DECISION NEEDS AT LEAST 2 CHOICES','info'); return; }
+  app.choices.splice(i,1);
+  if(app.mode==='people') app.choicesPeople = [...app.choices];
+  else app.choicesOptions = [...app.choices];
+  renderChoices(); updateSetup();
+});
+ $('addChoiceBtn').addEventListener('click', ()=>{
+  if(app.choices.length>=36) return;
+  app.choices.push('');
+  if(app.mode==='people') app.choicesPeople = [...app.choices];
+  else app.choicesOptions = [...app.choices];
+  renderChoices(true); updateSetup();
+});
+ $('choicesList').addEventListener('keydown', e=>{
+  if(e.key==='Enter' && e.target.classList.contains('choice-input')){
+    e.preventDefault();
+    if(app.choices.length<36){ app.choices.push(''); renderChoices(true); updateSetup(); }
+  }
+});
+
+ $('modeSeg').addEventListener('click', e=>{
+  const b=e.target.closest('.seg-btn'); if(!b) return;
+  // save current choices to its mode store
+  if(app.mode==='people') app.choicesPeople = [...app.choices];
+  else app.choicesOptions = [...app.choices];
+  
+  app.mode=b.dataset.mode;
+  document.querySelectorAll('.seg-btn').forEach(x=>{
+    const on=x.dataset.mode===app.mode;
+    x.classList.toggle('active',on); x.setAttribute('aria-selected',String(on));
+  });
+  $('choicesLabel').textContent=app.mode.toUpperCase();
+  $('addChoiceText').textContent=app.mode==='people'?'ADD PERSON':'ADD OPTION';
+  // load stored choices for this mode, ensuring defaults
+  if(app.mode==='people'){
+    app.choices = app.choicesPeople.length ? [...app.choicesPeople] : Array(6).fill('');
+    if(app.choices.length < 6) while(app.choices.length < 6) app.choices.push('');
+  }else{
+    app.choices = app.choicesOptions.length ? [...app.choicesOptions] : Array(2).fill('');
+    // enforce exactly 2 on first time, don't keep 6
+    if(app.choicesOptions.length===0 || (app.choices.length>2 && app.choicesPeople.length===6)){
+      // if coming from people default, reset to 2 if no custom options saved yet
+      const hasCustom = app.choicesOptions.some(v=>v.trim());
+      if(!hasCustom) app.choices = Array(2).fill('');
+    }
+    if(app.choices.length < 2) while(app.choices.length < 2) app.choices.push('');
+  }
+  renderChoices(); updateSetup();
+});
+ $('catChips').addEventListener('click', e=>{
+  const b=e.target.closest('.chip'); if(!b) return;
+  app.category=b.dataset.cat;
+  document.querySelectorAll('#catChips .chip').forEach(x=>x.classList.toggle('active',x===b));
+});
+ $('blindToggle').addEventListener('change', e=>app.blind=e.target.checked);
+ $('titleInput').addEventListener('input', e=>{ app.title=e.target.value; updateSetup(); });
+
+function updateSetup(){
+  const rawValid = validChoices().length;
+  const eff = effectiveChoices();
+  const n = eff.length>=2 ? eff.length : rawValid;
+  const displayN = app.choices.length;
+  $('choicesCount').textContent=`${displayN}/36 · MIN 2`;
+  $('fairPct').textContent = n>=2 ? fmtPct(n) : '—';
+  const dc=diceCountFor(n||1);
+  $('fairMeta').textContent = n>=2
+    ? `${n} CHOICES · ${dc} D6${dc>1?' · BASE-6 MAPPING':''} · REJECTION SAMPLED`
+    : 'ADD AT LEAST 2 CHOICES — OR JUST ADD A TITLE TO CAST WITH AUTO NAMES';
+  const hasTitle = !!app.title.trim();
+  const canCastNow = (hasTitle && app.choices.length>=2) || rawValid>=2 || (hasTitle && eff.length>=2);
+  $('castBtn').disabled = !canCastNow || app.rolling || suiteBusy;
+  $('dist').style.display = (app.lastDecision && app.lastDecision.n>6) ? 'none' : 'flex';
+  if(!app.rolling && app.phase!=='result'){
+    ensureDice(dc);
+    dice.forEach(d=>{ if(d.mode!=='idle') d.mode='idle'; });
+    setPhase('READY', n>=2 ? `${n} CHOICES ARMED · ${fmtPct(n)} EACH` : 'SET UP YOUR DECISION');
+    authority(n>=2?'ENGINE ARMED':'ENGINE READY', true);
+  }
+}
+
+/* ================================================================
+   7. THE CAST — crypto pick FIRST, physics visualizes, verification gates reveal
+   ================================================================ */
+async function castDecision(forced=null){
+  if(app.rolling || suiteBusy) return;
+  try{
+    const stage = document.getElementById('stage');
+    if(stage){
+      const isMobile = window.innerWidth<=900;
+      if(isMobile) stage.scrollIntoView({behavior:'smooth', block:'start'});
+      else stage.scrollIntoView({behavior:'smooth', block:'center'});
+    }
+  }catch(e){}
+  const choices = forced ? forced.choices : effectiveChoices();
+  const n = choices.length;
+  if(!forced && n<2) return;
+
+  app.rolling=true;
+  document.body.dataset.appPhase='rolling';
+  $('setupPane').classList.add('locked');
+  $('resultPane').hidden=true; $('setupPane').hidden=false;
+  updateSetup();
+
+  // 1 — LOCK: the authoritative result is selected here, before any motion.
+  const pickRes = forced ? { index:forced.index, rawHex:RandomEngine.hex(4) } : RandomEngine.pick(n);
+  const selectedIndex = pickRes.index;
+  const diceCount = diceCountFor(n);
+  const targetValues = targetsFor(selectedIndex, diceCount);
+  rollN = n;
+
+  const decision = {
+    id: AuditEngine.decisionId(),
+    ts: new Date().toISOString(),
+    title: (app.title.trim() || 'Untitled decision'),
+    mode: app.mode, category: app.category, blind: app.blind,
+    choices, n, selectedIndex, targetValues, diceCount,
+    raw: pickRes.rawHex
+  };
+  decision.canonical = AuditEngine.canonical(decision);
+  decision.hash = await AuditEngine.sha256Hex(decision.canonical);
+
+  setPhase('LOCKED', `${n} CHOICES · ${fmtPct(n)} EACH · ${diceCount} D6`);
+  authority(`RESULT LOCKED · ENTROPY ${decision.raw}`, true);
+  announce('Result locked. Casting the dice.');
+  // blind chips — tokens or names
+  const chips=$('phaseChips'); chips.innerHTML='';
+  choices.forEach((c,i)=>{
+    const el=document.createElement('span'); el.className='chip';
+    el.textContent = app.blind ? `C${pad2(i+1)}` : (c.length>14 ? c.slice(0,13)+'…' : c);
+    chips.appendChild(el);
+  });
+
+  Sound.resume(); Sound.whoosh();
+
+  // 2 — VISUALIZE: pure show; physics never feeds back into the result.
+  setPhase('CAST', 'THE DICE IS PHYSICAL. THE RESULT IS NOT.');
+  const outcome = await castDice(targetValues);
+
+  // 3 — VERIFY: read actual settled orientations, compare with the locked pick.
+  setPhase('VERIFYING','POST-SETTLE FACE VERIFICATION');
+  const shownIndex = indexFromTargets(outcome.faces);
+  const ok = shownIndex===selectedIndex && outcome.faces.every((f,i)=>f===targetValues[i]);
+  decision.shownFaces = outcome.faces;
+  decision.residual = outcome.residual;
+  decision.verify = ok ? 'OK' : 'MISMATCH';
+
+  ledger.rolls++; ok ? ledger.matched++ : ledger.miss++;
+  if(n<=6) ledger.dist[selectedIndex+1]++;
+  ledgerUpdate();
+  $('tPick').textContent = targetValues.map(pad2).join(' ');
+  $('tResult').textContent = '#'+pad2(shownIndex+1);
+  const chk=$('tCheck');
+  chk.textContent = ok?'PASS':'FAIL';
+  chk.className = ok?'ok':'bad';
+  $('tErr').textContent = outcome.residual.toFixed(3)+'°';
+
+  await sleep(ok ? 280 : 650);
+
+  // 4 — REVEAL: only now, after verification.
+  app.lastDecision=decision;
+  decision.accepted=false;
+  history.unshift(decision);
+  if(history.length>24) history.length=24;
+  store.set('dice2-history', history);
+  renderHistory();
+
+  bigNumStamp(selectedIndex+1);
+  if(ok){
+    Sound.chime(); Haptics.reveal();
+    setPhase('VERIFIED', `RESIDUAL ${outcome.residual.toFixed(3)}° · MAPPING EXACT`);
+    authority(`THE DICE HAS SPOKEN → #${selectedIndex+1}`, true);
+    announce(`Decision complete. Choice ${selectedIndex+1}: ${choices[selectedIndex]}. Verified.`);
+  }else{
+    setPhase('MISMATCH', 'MISMATCH DETECTED AND RECORDED');
+    authority('VERIFICATION FAILED — MISMATCH RECORDED', true, true);
+    toast('POST-SETTLE MISMATCH — RECORDED IN THE DECISION RECORD','error');
+    announce('Verification mismatch. The result is recorded with a mismatch flag.');
+  }
+  renderResult(decision, ok);
+
+  app.rolling=false;
+  // REQ: auto scroll to result when dice settles
+  try{
+    // immediate + delayed attempts to ensure layout settled
+    scrollToResultPanel();
+    setTimeout(()=>scrollToResultPanel(), 350);
+    setTimeout(()=>scrollToResultPanel(), 900);
+  }catch(e){}
+
+  document.body.dataset.appPhase='result';
+  app.phase='result';
+  $('setupPane').hidden=true;
+  $('resultPane').hidden=false;
+  $('setupPane').classList.remove('locked');
+  setStatus();
+}
+ $('castBtn').addEventListener('click', ()=>castDecision());
+
+function scrollToResultPanel(){
+  try{
+    const rp=document.getElementById('resultPane');
+    const leftCol=document.querySelector('.col-left');
+    if(!rp || rp.hidden) return;
+    // mobile: scroll window
+    if(window.innerWidth<=900){
+      rp.scrollIntoView({behavior:'smooth', block:'start'});
+    }else{
+      // desktop: scroll the left column and also ensure window focus
+      rp.scrollIntoView({behavior:'smooth', block:'start', inline:'nearest'});
+      if(leftCol) leftCol.scrollTo({top:0, behavior:'smooth'});
+    }
+  }catch(e){}
+}
+function renderResult(d, ok){
+  $('mismatchBanner').hidden = ok;
+  $('resNumber').textContent='#'+pad2(d.selectedIndex+1);
+  // re-trigger the stamp animation
+  const num=$('resNumber'); num.style.animation='none'; void num.offsetWidth; num.style.animation='';
+  $('resName').textContent = d.choices[d.selectedIndex] || `CHOICE ${d.selectedIndex+1}`;
+  $('resContext').textContent = `${d.category.toUpperCase()} · ${d.mode.toUpperCase()}${d.blind?' · DOUBLE-BLIND':''}`;
+  $('resProb').textContent = fmtPct(d.n);
+  $('resChoicesN').textContent = `${d.n}`;
+  $('resDice').textContent = `${d.diceCount} D6 → FACES [${d.targetValues.join(' ')}]`;
+  $('resId').textContent = d.id;
+  $('resRaw').textContent = d.raw;
+  $('resTs').textContent = new Date(d.ts).toLocaleString();
+  $('resHash').textContent = d.hash.slice(0,10)+'…'+d.hash.slice(-6);
+  const rv=$('resVerify');
+  rv.textContent = ok ? `OK · RESIDUAL ${d.residual.toFixed(3)}°` : `MISMATCH · EXPECTED [${d.targetValues.join(' ')}] SHOWN [${d.shownFaces.join(' ')}]`;
+  rv.className = 'v ' + (ok?'ok':'bad');
+  const badge=$('resBadge');
+  badge.classList.toggle('fail', !ok);
+  $('resBadgeText').textContent = ok ? 'RESULT VERIFIED' : 'MISMATCH — RECORDED';
+  const acc=$('acceptBtn');
+  acc.disabled=false; acc.textContent='ACCEPT RESULT';
+}
+ $('resHash').addEventListener('click', async ()=>{
+  if(!app.lastDecision) return;
+  try{ await navigator.clipboard.writeText(app.lastDecision.hash); toast('FULL SHA-256 HASH COPIED','success'); }
+  catch(e){ toast('CLIPBOARD UNAVAILABLE','error'); }
+});
+ $('acceptBtn').addEventListener('click', ()=>{
+  if(!app.lastDecision || app.lastDecision.accepted) return;
+  app.lastDecision.accepted=true;
+  const i=history.findIndex(h=>h.id===app.lastDecision.id);
+  if(i>=0){ history[i].accepted=true; store.set('dice2-history',history); }
+  $('acceptBtn').disabled=true; $('acceptBtn').textContent='ACCEPTED ✓';
+  renderHistory();
+  toast('DECISION ACCEPTED AND RECORDED','success');
+});
+ $('rollAgainBtn').addEventListener('click', ()=>castDecision());
+ $('recordBtn').addEventListener('click', ()=>{ if(app.lastDecision) openRecord(app.lastDecision); });
+ $('restartBtn').addEventListener('click', ()=>confirmAction({
+  title:'Restart decision?',
+  text:'Your choices stay filled so you can edit them. The completed result remains in history.',
+  confirm:'RESTART', onConfirm: backToSetup
+}));
+function backToSetup(){
+  $('resultPane').hidden=true;
+  $('setupPane').hidden=false;
+  $('setupPane').classList.remove('locked');
+  bigNum.classList.remove('stamp'); bigNum.textContent='—';
+  $('tPick').textContent='SEALED'; $('tResult').textContent='—';
+  $('tCheck').textContent='—'; $('tCheck').className='';
+  $('phaseChips').innerHTML='';
+  app.phase='ready';
+  updateSetup();
+}
+
+/* ================================================================
+   8. DECISION RECORD PANEL + COPY + PRINT + HISTORY
+   ================================================================ */
+let currentRecord=null;
+function recordHTML(d){
+  const ok=d.verify==='OK';
+  return `
+  <div class="r-sec">
+    <div class="r-field"><span class="k">RESULT</span>
+      <span class="v big">#${pad2(d.selectedIndex+1)} — ${escapeHtml(d.choices[d.selectedIndex]||'')}</span></div>
+    <div class="r-grid">
+      <div class="r-field"><span class="k">DECISION ID</span><span class="v mono">${d.id}</span></div>
+      <div class="r-field"><span class="k">TIMESTAMP</span><span class="v">${new Date(d.ts).toLocaleString()}</span></div>
+      <div class="r-field"><span class="k">TITLE</span><span class="v">${escapeHtml(d.title)}</span></div>
+      <div class="r-field"><span class="k">MODE / CATEGORY</span><span class="v">${d.mode.toUpperCase()} · ${escapeHtml(d.category).toUpperCase()}</span></div>
+      <div class="r-field"><span class="k">ENTROPY (RAW DRAW)</span><span class="v mono">${d.raw}</span></div>
+      <div class="r-field"><span class="k">ALGORITHM</span><span class="v">CRYPTO.getRandomValues · REJECTION SAMPLED</span></div>
+      <div class="r-field"><span class="k">PROBABILITY</span><span class="v">${fmtPct(d.n)} EACH · ${d.n} CHOICES</span></div>
+      <div class="r-field"><span class="k">DICE / TARGET FACES</span><span class="v">${d.diceCount} D6 → [${d.targetValues.join(' ')}]</span></div>
+    </div>
+  </div>
+  <div class="r-sec">
+    <div class="r-sec-t">CHOICES (${d.n})</div>
+    <div class="r-choices">${d.choices.map((c,i)=>
+      `<div class="r-choice ${i===d.selectedIndex?'sel':''}"><span class="n">${pad2(i+1)}</span><span>${escapeHtml(c)}</span></div>`
+    ).join('')}</div>
+  </div>
+  <div class="r-sec">
+    <div class="r-sec-t">VERIFICATION</div>
+    <div class="r-status ${ok?'':'fail'}"><span class="c">${ok?'✓':'!'}</span>
+      ${ok ? `CHECK OK · RESIDUAL ${(+d.residual).toFixed(3)}°` : `MISMATCH · EXPECTED [${d.targetValues.join(' ')}] SHOWN [${(d.shownFaces||[]).join(' ')}] — RECORDED`}
+    </div>
+    <div class="r-field"><span class="k">METHOD</span>
+      <span class="v" style="font-size:12px">Deterministic result-to-orientation mapping with post-settle face verification.</span></div>
+  </div>
+  <div class="r-sec">
+    <div class="r-sec-t">CANONICAL AUDIT — SHA-256</div>
+    <div class="hash-block"><div class="k">SHA-256(CANONICAL RECORD)</div><div class="h">${d.hash}</div></div>
+    <div class="hash-block"><div class="k">CANONICAL STRING (HASHED)</div><div class="h">${escapeHtml(d.canonical||'')}</div></div>
+  </div>`;
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function openRecord(d){
+  currentRecord=d;
+  $('recordBody').innerHTML=recordHTML(d);
+  $('recordPanel').classList.add('open');
+  $('recordPanel').setAttribute('aria-hidden','false');
+  $('recordOverlay').classList.add('open');
+}
+function closeRecord(){
+  $('recordPanel').classList.remove('open');
+  $('recordPanel').setAttribute('aria-hidden','true');
+  $('recordOverlay').classList.remove('open');
+}
+ $('recordClose').addEventListener('click', closeRecord);
+ $('recordOverlay').addEventListener('click', closeRecord);
+
+function recordToText(d){
+  return [
+    'THE DICE — DECISION RECORD',
+    `ID       : ${d.id}`,
+    `DATE     : ${new Date(d.ts).toLocaleString()}`,
+    `TITLE    : ${d.title}`,
+    `MODE     : ${d.mode.toUpperCase()} · ${d.category.toUpperCase()}${d.blind?' · DOUBLE-BLIND':''}`,
+    `ENTROPY  : ${d.raw} (crypto.getRandomValues, rejection sampled)`,
+    `RESULT   : #${d.selectedIndex+1} — ${d.choices[d.selectedIndex]} (of ${d.n} · ${fmtPct(d.n)})`,
+    `DICE     : ${d.diceCount} D6 → target faces [${d.targetValues.join(' ')}]`,
+    `CHECK    : ${d.verify}${d.verify==='OK'?` (residual ${(+d.residual).toFixed(3)}°)`:` — expected [${d.targetValues.join(' ')}] shown [${(d.shownFaces||[]).join(' ')}]`}`,
+    `METHOD   : Deterministic result-to-orientation mapping with post-settle face verification.`,
+    `SHA-256  : ${d.hash}`,
+    'CHOICES  :',
+    ...d.choices.map((c,i)=>`  ${pad2(i+1)} ${c}${i===d.selectedIndex?'   ← SELECTED':''}`)
+  ].join('\n');
+}
+ $('copyRecord').addEventListener('click', async ()=>{
+  if(!currentRecord) return;
+  try{ await navigator.clipboard.writeText(recordToText(currentRecord)); toast('RECORD COPIED TO CLIPBOARD','success'); }
+  catch(e){ toast('CLIPBOARD UNAVAILABLE','error'); }
+});
+ $('printRecord').addEventListener('click', ()=>{
+  if(!currentRecord) return;
+  const d=currentRecord, ok=d.verify==='OK';
+  $('printArea').innerHTML=`<div class="print-inner">
+    <div class="print-header">
+      <div><div class="print-brand">THE DICE</div><div class="print-brand-sub">Neutral Decision Engine · Decision Record</div></div>
+      <div class="print-meta">ID <span class="print-id">${d.id}</span><br>${escapeHtml(new Date(d.ts).toLocaleString())}</div>
+    </div>
+    <div class="print-title-block">
+      <div class="print-title-label">Decision</div>
+      <div class="print-title">${escapeHtml(d.title)}</div>
+    </div>
+    <div class="print-result-block">
+      <div class="print-result-number">${pad2(d.selectedIndex+1)}</div>
+      <div class="print-result-name">${escapeHtml(d.choices[d.selectedIndex]||'')}</div>
+      <div class="print-result-context">${escapeHtml(d.category)} · ${d.mode}${d.blind?' · double-blind':''}</div>
+    </div>
+    <div class="print-grid">
+      <div class="print-field"><div class="print-field-label">Choices</div><div class="print-field-value">${d.n} (equal probability ${fmtPct(d.n)})</div></div>
+      <div class="print-field"><div class="print-field-label">Dice</div><div class="print-field-value">${d.diceCount} D6 → [${d.targetValues.join(' ')}]</div></div>
+      <div class="print-field"><div class="print-field-label">Entropy</div><div class="print-field-value mono">${d.raw}</div></div>
+      <div class="print-field"><div class="print-field-label">Algorithm</div><div class="print-field-value">crypto.getRandomValues · rejection sampled</div></div>
+    </div>
+    <div class="print-choices">${d.choices.map((c,i)=>`${pad2(i+1)} — ${escapeHtml(c)}${i===d.selectedIndex?'  ← SELECTED':''}`).join('<br>')}</div>
+    <div class="print-status">${ok?'CHECK OK':'MISMATCH RECORDED'}</div>
+    <div class="print-hash">SHA-256 (canonical record): ${d.hash}</div>
+    <div class="print-footer">Deterministic result-to-orientation mapping with post-settle face verification.<br>The cryptographic draw is authoritative; the die visualizes and the settled face is independently verified.<br>© The Dice — Decide. Fairly. Instantly.</div>
+  </div>`;
+  window.print();
+});
+
+/* ------------------------------ history ------------------------------ */
+function renderHistory(){
+  const wrap=$('historyItems');
+  $('historyStrip').hidden = history.length===0;
+  wrap.innerHTML='';
+  history.slice(0,12).forEach(h=>{
+    const b=document.createElement('button');
+    b.className='h-item';
+    const t=new Date(h.ts);
+    b.innerHTML=`<span class="hn">#${pad2(h.selectedIndex+1)}</span> · ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}${h.verify!=='OK'?' <span class="warn">!</span>':''}${h.accepted?' ✓':''}`;
+    b.addEventListener('click',()=>openRecord(h));
+    wrap.appendChild(b);
+  });
+  if(history.length){
+    const clear=document.createElement('button');
+    clear.className='h-item clear'; clear.textContent='CLEAR';
+    clear.addEventListener('click',()=>confirmAction({
+      title:'Clear decision history?',
+      text:'All locally stored decision records will be removed from this device.',
+      confirm:'CLEAR', onConfirm:()=>{ history.length=0; store.set('dice2-history',[]); renderHistory(); toast('HISTORY CLEARED','info'); }
+    }));
+    wrap.appendChild(clear);
+  }
+}
+
+/* ------------------------------ confirm modal ------------------------------ */
+let modalAction=null;
+function confirmAction({title,text,confirm,onConfirm}){
+  $('modalTitle').textContent=title;
+  $('modalText').textContent=text;
+  $('modalConfirm').textContent=confirm;
+  modalAction=onConfirm;
+  $('confirmModal').classList.add('open');
+}
+ $('modalCancel').addEventListener('click',()=>$('confirmModal').classList.remove('open'));
+ $('modalConfirm').addEventListener('click',()=>{
+  $('confirmModal').classList.remove('open');
+  modalAction&&modalAction(); modalAction=null;
+});
+ $('confirmModal').addEventListener('click',e=>{ if(e.target.id==='confirmModal') e.currentTarget.classList.remove('open'); });
+
+/* ------------------------------ keyboard ------------------------------ */
+addEventListener('keydown', e=>{
+  if(e.repeat) return;
+  if(e.target.matches('input,textarea')) { if(e.key==='Escape') e.target.blur(); return; }
+  if(e.code==='Space'){
+    e.preventDefault();
+    if(app.rolling||suiteBusy) return;
+    if(app.phase==='result') castDecision();
+    else if(effectiveChoices().length>=2) castDecision();
+  }
+  else if(e.key>='1'&&e.key<='3') setView(+e.key-1);
+  else if(e.key==='m'||e.key==='M') $('soundToggle').click();
+  else if(e.key==='Escape'){
+    closeRecord();
+    $('confirmModal').classList.remove('open');
+    $('telemetry').classList.remove('open');
+  }
+});
+ $('teleToggle').addEventListener('click',()=>{
+  $('telemetry').classList.toggle('open');
+  const body=$('teleAccBody');
+  if($('telemetry').classList.contains('open') && body && !body.classList.contains('open')){
+    body.classList.add('open');
+    $('teleAccHead')?.setAttribute('aria-expanded','true');
+  }
+});
+(function(){
+  const head=$('teleAccHead'), body=$('teleAccBody');
+  if(!head||!body) return;
+  function toggleAcc(){
+    const open=body.classList.toggle('open');
+    head.setAttribute('aria-expanded', String(open));
+    const label = head.querySelector('span b');
+    if(label) label.textContent = open ? '// TELEMETRY — OPEN' : '// TELEMETRY';
+  }
+  head.addEventListener('click', toggleAcc);
+})();
+
+
+/* ================================================================
+   9. BOOT
+   ================================================================ */
+setTheme(store.get('dice-theme','dark'));
+renderSound();
+renderChoices();
+updateSetup();
+ledgerUpdate();
+renderHistory();
+resize();
+requestAnimationFrame(frame);
+
+// Warm up audio on first interaction (autoplay policies).
+addEventListener('pointerdown', ()=>Sound.resume(), { once:true });
+
+// Boot self-test: silent fast-forward verification of the orientation map.
+(async ()=>{
+  try{
+    const R=await runAuditSuite(false);
+    const n=R.face.n+R.multi.n, ok=R.face.ok+R.multi.ok;
+    app.selfTestOk = ok===n ? `${ok}/${n} OK` : `${ok}/${n} FAIL`;
+    const el=$('mapSelf');
+    el.textContent=app.selfTestOk;
+    el.className = ok===n?'ok':'bad';
+    setStatus();
+  }catch(e){ console.warn(e); }
+})();
+</script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/app/sw.js", {
+      scope: "/app/"
+    });
+  });
+}
+</script>
+</body>
+</html>

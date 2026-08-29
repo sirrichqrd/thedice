@@ -1,0 +1,44 @@
+{
+  "id": "/app/",
+  "name": "The Dice",
+  "short_name": "The Dice",
+  "description": "Neutral Decision Engine.",
+  "start_url": "/app/diceApp.html",
+  "scope": "/app/",
+  "display": "standalone",
+  "background_color": "#f0ead6",
+  "theme_color": "#1c1a14",
+  "orientation": "portrait-primary",
+
+  "icons": [
+    {
+      "src": "/app/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/app/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+
+  "screenshots": [
+    {
+      "src": "/app/screenshots/home.png",
+      "sizes": "1276x713",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "/app/screenshots/mobile.png",
+      "sizes": "491x703",
+      "type": "image/png"
+    }
+  ],
+
+  "display_override": [
+    "standalone",
+    "window-controls-overlay"
+  ]
+}
