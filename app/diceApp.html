@@ -12,6 +12,7 @@
 <link rel="apple-touch-icon" href="favicon.svg">
 <link rel="shortcut icon" type="image/svg" href="favicon.svg">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="The Dice">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -912,6 +913,15 @@ const Analytics = {
     }catch(e){ console.warn('analytics track failed', e); }
   }
 };
+
+// Fix AbortError: The play() request was interrupted by a call to pause()
+window.addEventListener('unhandledrejection', (e)=>{
+  if(e.reason && e.reason.name==='AbortError' && String(e.reason.message).includes('play()')){
+    e.preventDefault();
+    console.warn('[Audio] play() aborted - safe to ignore');
+  }
+});
+
 window.DiceAnalytics = Analytics;
 window.DiceIdentity = Identity;
 
@@ -1927,7 +1937,7 @@ async function castDecision(forced=null){
   });
 
   try{ const rollNum = Identity.incRoll(); Analytics.track('dice_roll_started', {option_count: n, roll_number_in_session: rollNum, is_repeat_roll: rollNum>1, dice_count: diceCount}); }catch(err){}
-  Sound.resume(); Sound.whoosh();
+  try{ Sound.resume(); }catch(e){} try{ Sound.whoosh(); }catch(e){ console.warn('sound whoosh failed', e); }
 
   // 2 — VISUALIZE: pure show; physics never feeds back into the result.
   setPhase('CAST', 'THE DICE IS PHYSICAL. THE RESULT IS NOT.');
@@ -1944,6 +1954,14 @@ async function castDecision(forced=null){
   ledger.rolls++; ok ? ledger.matched++ : ledger.miss++;
   if(n<=6) ledger.dist[selectedIndex+1]++;
   ledgerUpdate();
+  // PHASE 1 FIX: track completed roll here (authoritative)
+  try{
+    const props = {option_count: n, roll_number_in_session: Identity.rollCountSession, is_repeat_roll: Identity.rollCountSession>1, dice_count: diceCount, verified: ok, residual: outcome.residual};
+    console.log('[Analytics] dice_roll_completed', props);
+    Analytics.track('dice_roll_completed', props);
+    Analytics.track('total_roll', props); // legacy alias for dashboard compatibility
+  }catch(e){ console.warn('completed track failed', e); }
+
   $('tPick').textContent = targetValues.map(pad2).join(' ');
   $('tResult').textContent = '#'+pad2(shownIndex+1);
   const chk=$('tCheck');
@@ -2232,7 +2250,7 @@ ${shareUrl}`;
         localStorage.setItem('dice_feedback_nudged','1');
       }
     }, 2000);
-    try{ Analytics.track('dice_roll_completed', {option_count: d.n, roll_number_in_session: Identity.rollCountSession, is_repeat_roll: Identity.rollCountSession>1, dice_count: d.diceCount, verified: ok}); }catch(e){}
+    // completed tracking moved to castDecision for reliability
   };
 })();
 
