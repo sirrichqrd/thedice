@@ -569,7 +569,33 @@ input{font-family:inherit;color:inherit;background:transparent;border:none;outli
   .col-right{flex-direction:column;align-items:stretch}
 }
 
+
+/* ================= PHASE 1 — Share + Feedback + Analytics ================= */
+.share-btn{position:relative}
+.feedback-fab{position:fixed;right:18px;bottom:18px;z-index:12;width:42px;height:42px;border-radius:50%;background:var(--bg-elev);border:1px solid var(--border-strong);display:grid;place-items:center;color:var(--muted);box-shadow:var(--shadow);transition:all .2s;font-size:18px}
+.feedback-fab:hover{color:var(--fg);border-color:var(--accent);transform:translateY(-2px)}
+.feedback-panel{position:fixed;inset:0;z-index:25;display:none;place-items:center;padding:20px;background:rgba(0,0,0,.55);backdrop-filter:blur(8px)}
+.feedback-panel.open{display:grid}
+.feedback-card{width:min(440px,100%);background:var(--bg-elev);border:1px solid var(--border-strong);border-radius:20px;padding:22px 22px 18px;display:flex;flex-direction:column;gap:16px;animation:paneIn .4s both}
+.feedback-head{display:flex;justify-content:space-between;align-items:center}
+.feedback-title{font-family:'Fraunces',serif;font-weight:700;font-size:20px}
+.feedback-sub{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--muted)}
+.stars{display:flex;gap:6px}
+.star{font-size:22px;color:var(--border-strong);cursor:pointer;transition:all .15s}
+.star.active,.star:hover{color:var(--accent);transform:scale(1.1)}
+.feedback-textarea{width:100%;min-height:88px;resize:vertical;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:var(--bg-elev-2);font-family:'Space Grotesk',sans-serif;font-size:14px;color:var(--fg)}
+.feedback-input{width:100%;padding:11px 14px;border:1px solid var(--border);border-radius:12px;background:var(--bg-elev-2);font-family:'Space Grotesk',sans-serif;font-size:13px;color:var(--fg)}
+.feedback-cats{display:flex;flex-wrap:wrap;gap:6px}
+.fcat{padding:6px 12px;border-radius:999px;border:1px solid var(--border);background:var(--bg-elev-2);font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.08em;cursor:pointer;transition:all .2s;color:var(--fg-dim)}
+.fcat.active{border-color:var(--accent);color:var(--accent);background:rgba(var(--accent-rgb),.08)}
+
 </style>
+
+<script>
+window.__SUPABASE_URL__ = 'https://vvbcswolgbxystsfiooc.supabase.co';
+window.__SUPABASE_ANON_KEY__ = 'sb_publishable_5AblaC5je3t6O1C1lxnVSA_2X0r3A78';
+</script>
+
 </head>
 <body>
 
@@ -767,13 +793,13 @@ input{font-family:inherit;color:inherit;background:transparent;border:none;outli
   </div>
   <div class="record-body" id="recordBody"></div>
   <div class="record-actions">
-    <button id="copyRecord" class="btn-sec">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-      COPY RECORD
+    <button id="shareDecision" class="btn-primary share-btn">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+      SHARE DECISION
     </button>
-    <button id="printRecord" class="btn-primary">
+    <button id="printRecord" class="btn-sec">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-      PRINT RECORD
+      PRINT PDF
     </button>
   </div>
 </aside>
@@ -788,6 +814,23 @@ input{font-family:inherit;color:inherit;background:transparent;border:none;outli
       <button id="modalCancel" class="btn-cancel">CANCEL</button>
       <button id="modalConfirm" class="btn-confirm">CONFIRM</button>
     </div>
+  </div>
+</div>
+
+
+<button id="feedbackFab" class="feedback-fab" aria-label="Feedback" title="Feedback">💬</button>
+<div id="feedbackPanel" class="feedback-panel" aria-hidden="true">
+  <div class="feedback-card" role="dialog" aria-modal="true" aria-labelledby="feedbackTitle">
+    <div class="feedback-head">
+      <div><div class="feedback-title" id="feedbackTitle">What do you think?</div><div class="feedback-sub">Help us make The Dice better.</div></div>
+      <button id="feedbackClose" class="ibtn" aria-label="Close">✕</button>
+    </div>
+    <div><div class="field-label" style="margin-bottom:8px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted)">RATING</div><div class="stars" id="feedbackStars"><span class="star" data-v="1">★</span><span class="star" data-v="2">★</span><span class="star" data-v="3">★</span><span class="star" data-v="4">★</span><span class="star" data-v="5">★</span></div></div>
+    <div class="feedback-cats" id="feedbackCats"><button class="fcat" data-cat="liked">👍 Something I liked</button><button class="fcat" data-cat="suggestion">💡 Feature suggestion</button><button class="fcat" data-cat="confusing">🤔 Something confusing</button><button class="fcat" data-cat="bug">🐛 Something didn't work</button><button class="fcat" data-cat="general">💬 General feedback</button></div>
+    <textarea id="feedbackText" class="feedback-textarea" maxlength="2000" placeholder="Tell us what you think..."></textarea>
+    <input id="feedbackEmail" class="feedback-input" type="email" maxlength="120" placeholder="Want us to reply? Email (Optional)" />
+    <button id="feedbackSend" class="btn-primary">SEND FEEDBACK</button>
+    <div class="foot-note small" style="text-align:center;font-size:8px;color:var(--muted)">Anonymous • No login required • Feedback stored separately from analytics</div>
   </div>
 </div>
 
@@ -812,6 +855,66 @@ input{font-family:inherit;color:inherit;background:transparent;border:none;outli
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+// ================= PHASE 1 — ANONYMOUS ANALYTICS + SHARE + FEEDBACK =================
+const DICE_CONFIG = {
+  SUPABASE_URL: window.__SUPABASE_URL__ || 'https://YOUR_PROJECT.supabase.co',
+  SUPABASE_ANON_KEY: window.__SUPABASE_ANON_KEY__ || 'YOUR_ANON_KEY',
+  SITE_URL: 'https://thedyce.netlify.app',
+  ANALYTICS_ENDPOINT: window.__ANALYTICS_ENDPOINT__ || null,
+};
+const Identity = {
+  get clientId(){
+    let id = localStorage.getItem('dice_client_id');
+    if(!id){ id='dice_'+crypto.randomUUID(); localStorage.setItem('dice_client_id', id); localStorage.setItem('dice_first_seen', new Date().toISOString()); }
+    return id;
+  },
+  get sessionId(){
+    let sid = sessionStorage.getItem('dice_session_id');
+    if(!sid){ sid='sess_'+Date.now()+'_'+Math.random().toString(36).slice(2,8); sessionStorage.setItem('dice_session_id', sid); 
+      const sessions = JSON.parse(localStorage.getItem('dice_sessions')||'[]'); sessions.push({id:sid, ts:Date.now()}); localStorage.setItem('dice_sessions', JSON.stringify(sessions.slice(-50)));
+    }
+    return sid;
+  },
+  get isNewUser(){ const seen = localStorage.getItem('dice_seen_before'); if(!seen){ localStorage.setItem('dice_seen_before','1'); return true; } return false; },
+  get rollCountSession(){ return parseInt(sessionStorage.getItem('dice_roll_count_session')||'0'); },
+  incRoll(){ const n=this.rollCountSession+1; sessionStorage.setItem('dice_roll_count_session', String(n)); return n; }
+};
+const Analytics = {
+  queue:[],
+  track(name, props={}){
+    try{
+      const event = {
+        event: name,
+        timestamp: new Date().toISOString(),
+        client_id: Identity.clientId,
+        session_id: Identity.sessionId,
+        is_new_user: Identity.isNewUser,
+        url: location.href,
+        utm_source: new URLSearchParams(location.search).get('utm_source')||null,
+        utm_campaign: new URLSearchParams(location.search).get('utm_campaign')||null,
+        ...props
+      };
+      delete event.decision_text; delete event.options_content;
+      this.queue.push(event);
+      localStorage.setItem('dice_analytics_queue', JSON.stringify(this.queue.slice(-200)));
+      console.log('[Analytics]', name, event);
+      if(DICE_CONFIG.ANALYTICS_ENDPOINT){
+        fetch(DICE_CONFIG.ANALYTICS_ENDPOINT, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(event)}).catch(()=>{});
+      }
+      if(DICE_CONFIG.SUPABASE_URL && !DICE_CONFIG.SUPABASE_URL.includes('YOUR_PROJECT')){
+        fetch(`${DICE_CONFIG.SUPABASE_URL}/rest/v1/analytics_events`, {
+          method:'POST',
+          headers:{'Content-Type':'application/json','apikey':DICE_CONFIG.SUPABASE_ANON_KEY,'Authorization':`Bearer ${DICE_CONFIG.SUPABASE_ANON_KEY}`},
+          body:JSON.stringify({client_id:event.client_id, session_id:event.session_id, event_name:name, properties:props, created_at:event.timestamp, is_new_user:event.is_new_user, utm_source:event.utm_source, utm_campaign:event.utm_campaign})
+        }).catch(()=>{});
+      }
+    }catch(e){ console.warn('analytics track failed', e); }
+  }
+};
+window.DiceAnalytics = Analytics;
+window.DiceIdentity = Identity;
+
 
 /* ================================================================
    0. UTILITIES
@@ -1565,7 +1668,7 @@ async function runSuite(){
     suiteBusy=false; $('suiteBtn').disabled=false; updateSetup();
   }
 }
- $('suiteBtn').addEventListener('click', runSuite);
+ document.getElementById('suiteBtn')?.addEventListener('click', runSuite);
 async function selfTest(){
   const R=await runAuditSuite(false);
   const n=R.face.n+R.multi.n, ok=R.face.ok+R.multi.ok;
@@ -1636,7 +1739,7 @@ function renderSound(){
   $('soundToggle').classList.toggle('muted', !on);
   $('soundToggle').setAttribute('aria-pressed', String(on));
 }
- $('soundToggle').addEventListener('click', ()=>{
+ document.getElementById('soundToggle')?.addEventListener('click', ()=>{
   Sound.enabled=!Sound.enabled; Haptics.enabled=Sound.enabled;
   store.set('dice2-muted', !Sound.enabled);
   if(Sound.enabled) Sound.resume();
@@ -1676,7 +1779,7 @@ function renderChoices(focusLast=false){
   });
   if(focusLast){ const inp=list.querySelector(`[data-i="${app.choices.length-1}"].choice-input`); inp&&inp.focus(); }
 }
- $('choicesList').addEventListener('input', e=>{
+ document.getElementById('choicesList')?.addEventListener('input', e=>{
   const i=+e.target.dataset.i;
   if(!Number.isNaN(i)){
     app.choices[i]=e.target.value;
@@ -1685,7 +1788,7 @@ function renderChoices(focusLast=false){
     updateSetup();
   }
 });
- $('choicesList').addEventListener('click', e=>{
+ document.getElementById('choicesList')?.addEventListener('click', e=>{
   const btn=e.target.closest('.choice-x'); if(!btn) return;
   const i=+btn.dataset.i;
   if(app.choices.length<=2){ toast('A DECISION NEEDS AT LEAST 2 CHOICES','info'); return; }
@@ -1694,21 +1797,22 @@ function renderChoices(focusLast=false){
   else app.choicesOptions = [...app.choices];
   renderChoices(); updateSetup();
 });
- $('addChoiceBtn').addEventListener('click', ()=>{
+ document.getElementById('addChoiceBtn')?.addEventListener('click', ()=>{
   if(app.choices.length>=36) return;
+  try{ Analytics.track('option_added', {option_count: app.choices.length+1, mode:app.mode}); }catch(err){}
   app.choices.push('');
   if(app.mode==='people') app.choicesPeople = [...app.choices];
   else app.choicesOptions = [...app.choices];
   renderChoices(true); updateSetup();
 });
- $('choicesList').addEventListener('keydown', e=>{
+ document.getElementById('choicesList')?.addEventListener('keydown', e=>{
   if(e.key==='Enter' && e.target.classList.contains('choice-input')){
     e.preventDefault();
     if(app.choices.length<36){ app.choices.push(''); renderChoices(true); updateSetup(); }
   }
 });
 
- $('modeSeg').addEventListener('click', e=>{
+ document.getElementById('modeSeg')?.addEventListener('click', e=>{
   const b=e.target.closest('.seg-btn'); if(!b) return;
   // save current choices to its mode store
   if(app.mode==='people') app.choicesPeople = [...app.choices];
@@ -1737,13 +1841,13 @@ function renderChoices(focusLast=false){
   }
   renderChoices(); updateSetup();
 });
- $('catChips').addEventListener('click', e=>{
+ document.getElementById('catChips')?.addEventListener('click', e=>{
   const b=e.target.closest('.chip'); if(!b) return;
   app.category=b.dataset.cat;
   document.querySelectorAll('#catChips .chip').forEach(x=>x.classList.toggle('active',x===b));
 });
- $('blindToggle').addEventListener('change', e=>app.blind=e.target.checked);
- $('titleInput').addEventListener('input', e=>{ app.title=e.target.value; updateSetup(); });
+ document.getElementById('blindToggle')?.addEventListener('change', e=>app.blind=e.target.checked);
+ document.getElementById('titleInput')?.addEventListener('input', e=>{ const first = !app.title.trim() && e.target.value.trim(); app.title=e.target.value; if(first){ try{ Analytics.track('decision_started', {mode:app.mode}); }catch(err){} } updateSetup(); });
 
 function updateSetup(){
   const rawValid = validChoices().length;
@@ -1758,7 +1862,9 @@ function updateSetup(){
     : 'ADD AT LEAST 2 CHOICES — OR JUST ADD A TITLE TO CAST WITH AUTO NAMES';
   const hasTitle = !!app.title.trim();
   const canCastNow = (hasTitle && app.choices.length>=2) || rawValid>=2 || (hasTitle && eff.length>=2);
+  const wasDisabled = $('castBtn').disabled;
   $('castBtn').disabled = !canCastNow || app.rolling || suiteBusy;
+  if(canCastNow && wasDisabled){ try{ Analytics.track('decision_ready', {option_count: n, mode:app.mode, category:app.category}); }catch(err){} }
   $('dist').style.display = (app.lastDecision && app.lastDecision.n>6) ? 'none' : 'flex';
   if(!app.rolling && app.phase!=='result'){
     ensureDice(dc);
@@ -1820,6 +1926,7 @@ async function castDecision(forced=null){
     chips.appendChild(el);
   });
 
+  try{ const rollNum = Identity.incRoll(); Analytics.track('dice_roll_started', {option_count: n, roll_number_in_session: rollNum, is_repeat_roll: rollNum>1, dice_count: diceCount}); }catch(err){}
   Sound.resume(); Sound.whoosh();
 
   // 2 — VISUALIZE: pure show; physics never feeds back into the result.
@@ -1884,7 +1991,7 @@ async function castDecision(forced=null){
   $('setupPane').classList.remove('locked');
   setStatus();
 }
- $('castBtn').addEventListener('click', ()=>castDecision());
+ document.getElementById('castBtn')?.addEventListener('click', ()=>castDecision());
 
 function scrollToResultPanel(){
   try{
@@ -1924,12 +2031,12 @@ function renderResult(d, ok){
   const acc=$('acceptBtn');
   acc.disabled=false; acc.textContent='ACCEPT RESULT';
 }
- $('resHash').addEventListener('click', async ()=>{
+ document.getElementById('resHash')?.addEventListener('click', async ()=>{
   if(!app.lastDecision) return;
   try{ await navigator.clipboard.writeText(app.lastDecision.hash); toast('FULL SHA-256 HASH COPIED','success'); }
   catch(e){ toast('CLIPBOARD UNAVAILABLE','error'); }
 });
- $('acceptBtn').addEventListener('click', ()=>{
+ document.getElementById('acceptBtn')?.addEventListener('click', ()=>{
   if(!app.lastDecision || app.lastDecision.accepted) return;
   app.lastDecision.accepted=true;
   const i=history.findIndex(h=>h.id===app.lastDecision.id);
@@ -1938,9 +2045,9 @@ function renderResult(d, ok){
   renderHistory();
   toast('DECISION ACCEPTED AND RECORDED','success');
 });
- $('rollAgainBtn').addEventListener('click', ()=>castDecision());
- $('recordBtn').addEventListener('click', ()=>{ if(app.lastDecision) openRecord(app.lastDecision); });
- $('restartBtn').addEventListener('click', ()=>confirmAction({
+ document.getElementById('rollAgainBtn')?.addEventListener('click', ()=>castDecision());
+ document.getElementById('recordBtn')?.addEventListener('click', ()=>{ if(app.lastDecision) openRecord(app.lastDecision); });
+ document.getElementById('restartBtn')?.addEventListener('click', ()=>confirmAction({
   title:'Restart decision?',
   text:'Your choices stay filled so you can edit them. The completed result remains in history.',
   confirm:'RESTART', onConfirm: backToSetup
@@ -2000,6 +2107,8 @@ function recordHTML(d){
 }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 function openRecord(d){
+  try{ Analytics.track('decision_record_viewed', {option_count: d.n, dice_count: d.diceCount}); }catch(err){}
+
   currentRecord=d;
   $('recordBody').innerHTML=recordHTML(d);
   $('recordPanel').classList.add('open');
@@ -2011,8 +2120,121 @@ function closeRecord(){
   $('recordPanel').setAttribute('aria-hidden','true');
   $('recordOverlay').classList.remove('open');
 }
- $('recordClose').addEventListener('click', closeRecord);
- $('recordOverlay').addEventListener('click', closeRecord);
+ document.getElementById('recordClose')?.addEventListener('click', closeRecord);
+ document.getElementById('recordOverlay')?.addEventListener('click', closeRecord);
+
+
+// ================= SHARE DECISION =================
+async function buildShareMessage(){
+  const d = (typeof currentRecord !== 'undefined' && currentRecord) ? currentRecord : app.lastDecision;
+  if(!d) return '';
+  const decisionText = d.title || 'Our decision';
+  const shareUrl = `${DICE_CONFIG.SITE_URL}?utm_source=share&utm_campaign=dice_decision&utm_medium=referral&ref=${Identity.clientId.slice(0,8)}`;
+  return `🎲 The Dice has decided.
+
+Our decision: ${decisionText}.
+
+We used The Dice to settle it.
+
+Try The Dice yourself:
+${shareUrl}`;
+}
+
+(function initShare(){
+  const shareBtn = document.getElementById('shareDecision');
+  if(!shareBtn) return;
+  shareBtn.addEventListener('click', async ()=>{
+    try{ Analytics.track('decision_share_clicked', {option_count: (currentRecord?currentRecord.n:0)}); }catch(e){}
+    const message = await buildShareMessage();
+    const title = 'The Dice — Decision';
+    if(navigator.share){
+      try{
+        await navigator.share({title, text: message});
+        try{ Analytics.track('share_completed', {method:'web_share_api'}); }catch(e){}
+        toast('SHARED SUCCESSFULLY','success');
+      }catch(err){
+        if(err && err.name!=='AbortError'){
+          try{ await navigator.clipboard.writeText(message); Analytics.track('share_fallback_copied'); toast('SHARE MESSAGE COPIED','success'); }catch(_){ toast('SHARE FAILED','error'); }
+        }
+      }
+    }else{
+      try{ await navigator.clipboard.writeText(message); Analytics.track('share_fallback_copied'); toast('SHARE MESSAGE COPIED — SHARE IT WITH FRIENDS','success'); }catch(_){ toast('CLIPBOARD UNAVAILABLE','error'); }
+    }
+  });
+})();
+
+// ================= FEEDBACK CENTER =================
+(function initFeedback(){
+  let feedbackRating=0; let feedbackCat=null;
+  const fbFab=document.getElementById('feedbackFab'); const fbPanel=document.getElementById('feedbackPanel');
+  if(fbFab){ fbFab.addEventListener('click', ()=>{ fbPanel.classList.add('open'); fbPanel.setAttribute('aria-hidden','false'); }); }
+  const closeBtn=document.getElementById('feedbackClose');
+  if(closeBtn) closeBtn.addEventListener('click', ()=>{ fbPanel.classList.remove('open'); fbPanel.setAttribute('aria-hidden','true'); });
+  if(fbPanel) fbPanel.addEventListener('click', e=>{ if(e.target===fbPanel){ fbPanel.classList.remove('open'); fbPanel.setAttribute('aria-hidden','true'); } });
+  document.querySelectorAll('#feedbackStars .star').forEach(s=>{
+    s.addEventListener('click', ()=>{ feedbackRating=parseInt(s.dataset.v); document.querySelectorAll('#feedbackStars .star').forEach((st,i)=>{ st.classList.toggle('active', i<feedbackRating); }); });
+  });
+  document.querySelectorAll('#feedbackCats .fcat').forEach(b=>{
+    b.addEventListener('click', ()=>{ 
+      if(feedbackCat===b.dataset.cat){ feedbackCat=null; b.classList.remove('active'); }
+      else { feedbackCat=b.dataset.cat; document.querySelectorAll('#feedbackCats .fcat').forEach(x=>x.classList.remove('active')); b.classList.add('active'); }
+    });
+  });
+  const sendBtn=document.getElementById('feedbackSend');
+  if(sendBtn){
+    sendBtn.addEventListener('click', async ()=>{
+      const text=document.getElementById('feedbackText').value.trim();
+      const email=document.getElementById('feedbackEmail').value.trim();
+      if(!feedbackRating && !text){ toast('ADD A RATING OR COMMENT','info'); return; }
+      const payload={
+        client_id: Identity.clientId,
+        session_id: Identity.sessionId,
+        rating: feedbackRating||null,
+        comment: text||null,
+        category: feedbackCat||null,
+        email: email||null,
+        created_at: new Date().toISOString(),
+        url: location.href,
+        user_agent: navigator.userAgent
+      };
+      sendBtn.disabled=true; const old=sendBtn.textContent; sendBtn.textContent='SENDING...';
+      try{
+        const localFb = JSON.parse(localStorage.getItem('dice_feedback')||'[]'); localFb.push(payload); localStorage.setItem('dice_feedback', JSON.stringify(localFb));
+        if(DICE_CONFIG.SUPABASE_URL && !DICE_CONFIG.SUPABASE_URL.includes('YOUR_PROJECT')){
+          const res = await fetch(`${DICE_CONFIG.SUPABASE_URL}/rest/v1/feedback`, {
+            method:'POST',
+            headers:{'Content-Type':'application/json','apikey':DICE_CONFIG.SUPABASE_ANON_KEY,'Authorization':`Bearer ${DICE_CONFIG.SUPABASE_ANON_KEY}`},
+            body: JSON.stringify(payload)
+          });
+          if(!res.ok) throw new Error('supabase error');
+        }
+        toast('FEEDBACK SENT — THANK YOU!','success');
+        Analytics.track('feedback_submitted', {rating:feedbackRating, category:feedbackCat, has_comment:!!text, has_email:!!email});
+        document.getElementById('feedbackText').value=''; document.getElementById('feedbackEmail').value=''; feedbackRating=0; feedbackCat=null;
+        document.querySelectorAll('#feedbackStars .star').forEach(s=>s.classList.remove('active'));
+        document.querySelectorAll('#feedbackCats .fcat').forEach(s=>s.classList.remove('active'));
+        setTimeout(()=>{ fbPanel.classList.remove('open'); }, 800);
+      }catch(e){
+        console.error(e);
+        toast('FEEDBACK SAVED LOCALLY — WILL SYNC WHEN ONLINE','info');
+      }finally{
+        sendBtn.disabled=false; sendBtn.textContent=old;
+      }
+    });
+  }
+  // nudge after result
+  const _originalRenderResult = window.renderResult || renderResult;
+  window.renderResult = function(d, ok){
+    _originalRenderResult(d, ok);
+    setTimeout(()=>{ 
+      if(!localStorage.getItem('dice_feedback_nudged')){
+        if(fbFab) fbFab.style.boxShadow='0 0 0 4px rgba(var(--accent-rgb),.3)';
+        localStorage.setItem('dice_feedback_nudged','1');
+      }
+    }, 2000);
+    try{ Analytics.track('dice_roll_completed', {option_count: d.n, roll_number_in_session: Identity.rollCountSession, is_repeat_roll: Identity.rollCountSession>1, dice_count: d.diceCount, verified: ok}); }catch(e){}
+  };
+})();
 
 function recordToText(d){
   return [
@@ -2031,12 +2253,9 @@ function recordToText(d){
     ...d.choices.map((c,i)=>`  ${pad2(i+1)} ${c}${i===d.selectedIndex?'   ← SELECTED':''}`)
   ].join('\n');
 }
- $('copyRecord').addEventListener('click', async ()=>{
-  if(!currentRecord) return;
-  try{ await navigator.clipboard.writeText(recordToText(currentRecord)); toast('RECORD COPIED TO CLIPBOARD','success'); }
-  catch(e){ toast('CLIPBOARD UNAVAILABLE','error'); }
-});
- $('printRecord').addEventListener('click', ()=>{
+// copyRecord removed — replaced by shareDecision
+ document.getElementById('printRecord')?.addEventListener('click', ()=>{
+  try{ Analytics.track('decision_pdf_exported', {option_count: currentRecord?currentRecord.n:0}); }catch(err){}
   if(!currentRecord) return;
   const d=currentRecord, ok=d.verify==='OK';
   $('printArea').innerHTML=`<div class="print-inner">
@@ -2101,12 +2320,12 @@ function confirmAction({title,text,confirm,onConfirm}){
   modalAction=onConfirm;
   $('confirmModal').classList.add('open');
 }
- $('modalCancel').addEventListener('click',()=>$('confirmModal').classList.remove('open'));
- $('modalConfirm').addEventListener('click',()=>{
+ document.getElementById('modalCancel')?.addEventListener('click',()=>$('confirmModal').classList.remove('open'));
+ document.getElementById('modalConfirm')?.addEventListener('click',()=>{
   $('confirmModal').classList.remove('open');
   modalAction&&modalAction(); modalAction=null;
 });
- $('confirmModal').addEventListener('click',e=>{ if(e.target.id==='confirmModal') e.currentTarget.classList.remove('open'); });
+ document.getElementById('confirmModal')?.addEventListener('click',e=>{ if(e.target.id==='confirmModal') e.currentTarget.classList.remove('open'); });
 
 /* ------------------------------ keyboard ------------------------------ */
 addEventListener('keydown', e=>{
@@ -2126,7 +2345,7 @@ addEventListener('keydown', e=>{
     $('telemetry').classList.remove('open');
   }
 });
- $('teleToggle').addEventListener('click',()=>{
+ document.getElementById('teleToggle')?.addEventListener('click',()=>{
   $('telemetry').classList.toggle('open');
   const body=$('teleAccBody');
   if($('telemetry').classList.contains('open') && body && !body.classList.contains('open')){
@@ -2324,7 +2543,7 @@ function showIOSInstructions() {
 window.addEventListener("appinstalled", () => {
 
   deferredInstallPrompt = null;
-
+  try{ Analytics.track("pwa_installed"); }catch(err){}
   hideInstallPrompt();
 
   console.log("The Dice has been installed.");
@@ -2333,7 +2552,7 @@ window.addEventListener("appinstalled", () => {
 
 // PWA UPDATE DETECTOR — shows toast when new version is ready
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/app/sw.js').then(reg => {
+  navigator.serviceWorker.register('./sw.js').then(reg => {
     reg.addEventListener('updatefound', () => {
       const newWorker = reg.installing;
       newWorker.addEventListener('statechange', () => {

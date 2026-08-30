@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>The Dice — Analytics Dashboard (Admin Only)</title>
+
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Fraunces:wght@700;900&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#0c0b09;
+  --elev:#14120e;
+  --fg:#f0ead6;
+  --muted:#8a8275;
+  --border:rgba(240,234,214,.08);
+  --accent:#f59e0b;
+  --ok:#5eead4
+}
+
+*{
+  box-sizing:border-box;
+  margin:0;
+  padding:0
+}
+
+body{
+  background:var(--bg);
+  color:var(--fg);
+  font-family:'JetBrains Mono',monospace;
+  padding:24px
+}
+
+h1{
+  font-family:'Fraunces',serif;
+  font-size:32px;
+  margin-bottom:8px
+}
+
+.sub{
+  color:var(--muted);
+  font-size:12px;
+  margin-bottom:24px
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:12px;
+  margin-bottom:24px
+}
+
+.card{
+  background:var(--elev);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:16px
+}
+
+.card .k{
+  font-size:9px;
+  letter-spacing:.18em;
+  color:var(--muted);
+  margin-bottom:8px
+}
+
+.card .v{
+  font-size:28px;
+  font-weight:700;
+  color:var(--accent)
+}
+
+.section{
+  margin-top:32px
+}
+
+.section h2{
+  font-family:'Fraunces',serif;
+  font-size:20px;
+  margin-bottom:12px
+}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:12px
+}
+
+th,td{
+  padding:8px 10px;
+  border-bottom:1px solid var(--border);
+  text-align:left
+}
+
+th{
+  color:var(--muted);
+  font-size:10px;
+  letter-spacing:.12em
+}
+
+.feedback-item{
+  background:var(--elev);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:14px;
+  margin-bottom:10px
+}
+
+.badge{
+  padding:2px 8px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  font-size:10px
+}
+
+.login{
+  max-width:400px;
+  margin:80px auto;
+  background:var(--elev);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:24px
+}
+
+.login input{
+  width:100%;
+  padding:10px 12px;
+  margin:8px 0;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background:var(--bg);
+  color:var(--fg)
+}
+
+.btn{
+  padding:10px 16px;
+  border-radius:999px;
+  background:var(--accent);
+  color:#000;
+  font-weight:700;
+  border:none;
+  cursor:pointer;
+  width:100%;
+  margin-top:12px
+}
+
+.btn:disabled{
+  opacity:.6;
+  cursor:not-allowed
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body>
+
+<!-- =====================================================
+     LOGIN
+===================================================== -->
+
+<div id="loginView" class="login">
+
+  <h1>The Dice — Admin</h1>
+
+  <p class="sub">
+    Private Analytics Dashboard • Admin Only
+  </p>
+
+  <input
+    id="email"
+    type="email"
+    placeholder="Admin email"
+    autocomplete="username"
+  />
+
+  <input
+    id="password"
+    type="password"
+    placeholder="Password"
+    autocomplete="current-password"
+  />
+
+  <button class="btn" id="loginBtn">
+    LOGIN
+  </button>
+
+  <p class="sub" style="margin-top:12px">
+    Uses Supabase Auth — only authorized admins can access.
+  </p>
+
+</div>
+
+
+<!-- =====================================================
+     DASHBOARD
+===================================================== -->
+
+<div id="dashboardView" style="display:none">
+
+  <h1>The Dice — Analytics Dashboard</h1>
+
+  <p class="sub">
+    Behind the scenes, make it measurable • Phase 1 — First 100 users
+  </p>
+
+
+  <div class="grid" id="overviewGrid">
+
+    <div class="card">
+      <div class="k">TOTAL USERS</div>
+      <div class="v" id="totalUsers">—</div>
+    </div>
+
+    <div class="card">
+      <div class="k">NEW USERS</div>
+      <div class="v" id="newUsers">—</div>
+    </div>
+
+    <div class="card">
+      <div class="k">RETURNING USERS</div>
+      <div class="v" id="returningUsers">—</div>
+    </div>
+
+    <div class="card">
+      <div class="k">SESSIONS</div>
+      <div class="v" id="sessions">—</div>
+    </div>
+
+    <div class="card">
+      <div class="k">TOTAL ROLLS</div>
+      <div class="v" id="totalRolls">—</div>
+    </div>
+
+    <div class="card">
+      <div class="k">AVG ROLLS / SESSION</div>
+      <div class="v" id="avgRolls">—</div>
+    </div>
+
+  </div>
+
+
+  <div class="grid">
+
+    <div class="card">
+      <div class="k">DECISIONS STARTED</div>
+      <div class="v" id="decisionsStarted">—</div>
+    </div>
+
+    <div class="card">
+      <div class="k">COMPLETED ROLLS</div>
+      <div class="v" id="completedRolls">—</div>
+    </div>
+
+    <div class="card">
+      <div class="k">AVG OPTIONS / DECISION</div>
+      <div class="v" id="avgOptions">—</div>
+    </div>
+
+    <div class="card">
+      <div class="k">REPEAT ROLLS</div>
+      <div class="v" id="repeatRolls">—</div>
+    </div>
+
+    <div class="card">
+      <div class="k">RECORDS VIEWED</div>
+      <div class="v" id="recordsViewed">—</div>
+    </div>
+
+    <div class="card">
+      <div class="k">PDF EXPORTS</div>
+      <div class="v" id="pdfExports">—</div>
+    </div>
+
+  </div>
+
+
+  <div class="grid">
+
+    <div class="card">
+      <div class="k">SHARE CLICKS</div>
+      <div class="v" id="shareClicks">—</div>
+    </div>
+
+    <div class="card">
+      <div class="k">SUCCESSFUL SHARES</div>
+      <div class="v" id="shareSuccess">—</div>
+    </div>
+
+    <div class="card">
+      <div class="k">COPY FALLBACK</div>
+      <div class="v" id="shareCopy">—</div>
+    </div>
+
+    <div class="card">
+      <div class="k">REFERRAL TRAFFIC (utm_source=share)</div>
+      <div class="v" id="referral">—</div>
+    </div>
+
+    <div class="card">
+      <div class="k">PWA INSTALL PROMPTS</div>
+      <div class="v" id="pwaPrompts">—</div>
+    </div>
+
+    <div class="card">
+      <div class="k">PWA INSTALLED</div>
+      <div class="v" id="pwaInstalled">—</div>
+    </div>
+
+  </div>
+
+
+  <!-- ===================================================
+       FEEDBACK
+  ==================================================== -->
+
+  <div class="section">
+
+    <h2>Feedback — Overview</h2>
+
+    <div class="grid">
+
+      <div class="card">
+        <div class="k">TOTAL RESPONSES</div>
+        <div class="v" id="fbTotal">—</div>
+      </div>
+
+      <div class="card">
+        <div class="k">AVERAGE RATING</div>
+        <div class="v" id="fbAvg">—</div>
+      </div>
+
+    </div>
+
+    <div id="feedbackList"></div>
+
+  </div>
+
+
+  <!-- ===================================================
+       EVENTS
+  ==================================================== -->
+
+  <div class="section">
+
+    <h2>Recent Events</h2>
+
+    <table id="eventsTable">
+
+      <thead>
+        <tr>
+          <th>TIME</th>
+          <th>EVENT</th>
+          <th>CLIENT</th>
+          <th>PROPS</th>
+        </tr>
+      </thead>
+
+      <tbody></tbody>
+
+    </table>
+
+  </div>
+
+</div>
+
+
+<script>
+
+/* =====================================================
+   SUPABASE CONFIG
+===================================================== */
+
+const SUPABASE_URL =
+  window.__SUPABASE_URL__ ||
+  'https://vvbcswolgbxystsfiooc.supabase.co';
+
+const SUPABASE_KEY =
+  window.__SUPABASE_ANON_KEY__ ||
+  'sb_publishable_5AblaC5je3t6O1C1lxnVSA_2X0r3A78';
+
+
+const supabaseClient =
+  supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+  );
+
+
+/* =====================================================
+   ELEMENTS
+===================================================== */
+
+const loginView =
+  document.getElementById('loginView');
+
+const dashboardView =
+  document.getElementById('dashboardView');
+
+const loginBtn =
+  document.getElementById('loginBtn');
+
+const emailInput =
+  document.getElementById('email');
+
+const passwordInput =
+  document.getElementById('password');
+
+
+/* =====================================================
+   LOGIN
+===================================================== */
+
+loginBtn.addEventListener('click', login);
+
+passwordInput.addEventListener('keydown', function(event){
+
+  if(event.key === 'Enter'){
+    login();
+  }
+
+});
+
+
+async function login(){
+
+  const email =
+    emailInput.value.trim();
+
+  const password =
+    passwordInput.value;
+
+
+  if(!email || !password){
+
+    alert(
+      'Enter your admin email and password.'
+    );
+
+    return;
+  }
+
+
+  loginBtn.disabled = true;
+  loginBtn.textContent = 'CHECKING...';
+
+
+  try{
+
+    /* -----------------------------------------------
+       1. Authenticate with Supabase
+    ------------------------------------------------ */
+
+    const {
+      data,
+      error
+    } =
+      await supabaseClient.auth.signInWithPassword({
+        email,
+        password
+      });
+
+
+    if(error){
+      throw error;
+    }
+
+
+    if(!data.user){
+
+      throw new Error(
+        'Unable to authenticate user.'
+      );
+
+    }
+
+
+    /* -----------------------------------------------
+       2. Check admin_users
+    ------------------------------------------------ */
+
+    const {
+      data: admin,
+      error: adminError
+    } =
+      await supabaseClient
+        .from('admin_users')
+        .select('id,email')
+        .eq('id', data.user.id)
+        .maybeSingle();
+
+
+    if(adminError){
+
+      console.error(
+        'Admin verification error:',
+        adminError
+      );
+
+      throw new Error(
+        'Unable to verify administrator access.'
+      );
+
+    }
+
+
+    /* -----------------------------------------------
+       3. Reject non-admin users
+    ------------------------------------------------ */
+
+    if(!admin){
+
+      await supabaseClient.auth.signOut();
+
+      alert(
+        'Access denied. This account is not authorized as a Dice administrator.'
+      );
+
+      return;
+    }
+
+
+    /* -----------------------------------------------
+       4. Admin verified
+    ------------------------------------------------ */
+
+    showDashboard();
+
+  }
+
+  catch(error){
+
+    console.error(
+      'Login error:',
+      error
+    );
+
+    alert(
+      'Login failed: ' +
+      (error.message || 'Unknown error')
+    );
+
+  }
+
+  finally{
+
+    loginBtn.disabled = false;
+    loginBtn.textContent = 'LOGIN';
+
+  }
+
+}
+
+
+/* =====================================================
+   SHOW DASHBOARD
+===================================================== */
+
+async function showDashboard(){
+
+  loginView.style.display = 'none';
+
+  dashboardView.style.display = 'block';
+
+  await loadDashboard();
+
+}
+
+
+/* =====================================================
+   LOAD DASHBOARD DATA
+===================================================== */
+
+async function loadDashboard(){
+
+  try{
+
+    const [
+      eventsResult,
+      feedbackResult
+    ] = await Promise.all([
+
+      supabaseClient
+        .from('analytics_events')
+        .select('*')
+        .order(
+          'created_at',
+          { ascending:false }
+        )
+        .limit(500),
+
+      supabaseClient
+        .from('feedback')
+        .select('*')
+        .order(
+          'created_at',
+          { ascending:false }
+        )
+        .limit(100)
+
+    ]);
+
+
+    if(eventsResult.error){
+
+      throw eventsResult.error;
+
+    }
+
+
+    if(feedbackResult.error){
+
+      throw feedbackResult.error;
+
+    }
+
+
+    render(
+      eventsResult.data || [],
+      feedbackResult.data || []
+    );
+
+  }
+
+  catch(error){
+
+    console.error(
+      'Dashboard loading error:',
+      error
+    );
+
+    alert(
+      'Unable to load analytics: ' +
+      error.message
+    );
+
+  }
+
+}
+
+
+/* =====================================================
+   RENDER
+===================================================== */
+
+function render(events, feedback){
+
+  const eventName =
+    event => event.event_name || '';
+
+
+  /* ===================================================
+     USERS
+  ==================================================== */
+
+  const clients =
+    new Set(
+      events
+        .map(
+          e => e.client_id
+        )
+        .filter(Boolean)
+    );
+
+
+  const newUserClients =
+    new Set(
+      events
+        .filter(
+          e => e.is_new_user === true
+        )
+        .map(
+          e => e.client_id
+        )
+        .filter(Boolean)
+    );
+
+
+  document.getElementById(
+    'totalUsers'
+  ).textContent =
+    clients.size;
+
+
+  document.getElementById(
+    'newUsers'
+  ).textContent =
+    newUserClients.size;
+
+
+  document.getElementById(
+    'returningUsers'
+  ).textContent =
+    Math.max(
+      0,
+      clients.size -
+      newUserClients.size
+    );
+
+
+  /* ===================================================
+     SESSIONS
+  ==================================================== */
+
+  const sessions =
+    new Set(
+      events
+        .map(
+          e => e.session_id
+        )
+        .filter(Boolean)
+    );
+
+
+  document.getElementById(
+    'sessions'
+  ).textContent =
+    sessions.size;
+
+
+  /* ===================================================
+     ROLLS
+  ==================================================== */
+
+  const rolls =
+    events.filter(
+      e =>
+        eventName(e) ===
+        'dice_roll_completed'
+    );
+
+
+  document.getElementById(
+    'totalRolls'
+  ).textContent =
+    rolls.length;
+
+
+  document.getElementById(
+    'completedRolls'
+  ).textContent =
+    rolls.length;
+
+
+  const avgRolls =
+    sessions.size
+      ? rolls.length / sessions.size
+      : 0;
+
+
+  document.getElementById(
+    'avgRolls'
+  ).textContent =
+    avgRolls.toFixed(2);
+
+
+  /* ===================================================
+     DECISIONS
+  ==================================================== */
+
+  document.getElementById(
+    'decisionsStarted'
+  ).textContent =
+    events.filter(
+      e =>
+        eventName(e) ===
+        'decision_started'
+    ).length;
+
+
+  /* ===================================================
+     OPTIONS
+  ==================================================== */
+
+  const optionCounts =
+    rolls
+      .map(
+        e =>
+          e.properties?.option_count || 0
+      )
+      .filter(Boolean);
+
+
+  document.getElementById(
+    'avgOptions'
+  ).textContent =
+    optionCounts.length
+
+      ? (
+          optionCounts.reduce(
+            (sum, value) =>
+              sum + Number(value),
+            0
+          ) /
+          optionCounts.length
+        ).toFixed(1)
+
+      : '—';
+
+
+  /* ===================================================
+     REPEAT ROLLS
+  ==================================================== */
+
+  document.getElementById(
+    'repeatRolls'
+  ).textContent =
+    rolls.filter(
+      e =>
+        e.properties?.is_repeat_roll === true
+    ).length;
+
+
+  /* ===================================================
+     RECORDS / PDF
+  ==================================================== */
+
+  document.getElementById(
+    'recordsViewed'
+  ).textContent =
+    events.filter(
+      e =>
+        eventName(e) ===
+        'decision_record_viewed'
+    ).length;
+
+
+  document.getElementById(
+    'pdfExports'
+  ).textContent =
+    events.filter(
+      e =>
+        eventName(e) ===
+        'decision_pdf_exported'
+    ).length;
+
+
+  /* ===================================================
+     SHARING
+  ==================================================== */
+
+  document.getElementById(
+    'shareClicks'
+  ).textContent =
+    events.filter(
+      e =>
+        eventName(e) ===
+        'decision_share_clicked'
+    ).length;
+
+
+  document.getElementById(
+    'shareSuccess'
+  ).textContent =
+    events.filter(
+      e =>
+        eventName(e) ===
+        'share_completed'
+    ).length;
+
+
+  document.getElementById(
+    'shareCopy'
+  ).textContent =
+    events.filter(
+      e =>
+        eventName(e) ===
+        'share_fallback_copied'
+    ).length;
+
+
+  /* ===================================================
+     REFERRAL
+  ==================================================== */
+
+  document.getElementById(
+    'referral'
+  ).textContent =
+    events.filter(e => {
+
+      if(
+        e.utm_source === 'share'
+      ){
+        return true;
+      }
+
+      if(
+        e.properties?.utm_source ===
+        'share'
+      ){
+        return true;
+      }
+
+      return false;
+
+    }).length;
+
+
+  /* ===================================================
+     PWA
+  ==================================================== */
+
+  document.getElementById(
+    'pwaPrompts'
+  ).textContent =
+    events.filter(
+      e =>
+        eventName(e) ===
+        'pwa_install_prompt_shown'
+    ).length;
+
+
+  document.getElementById(
+    'pwaInstalled'
+  ).textContent =
+    events.filter(
+      e =>
+        eventName(e) ===
+        'pwa_installed'
+    ).length;
+
+
+  /* ===================================================
+     FEEDBACK
+  ==================================================== */
+
+  document.getElementById(
+    'fbTotal'
+  ).textContent =
+    feedback.length;
+
+
+  const ratings =
+    feedback
+      .map(
+        f => Number(f.rating)
+      )
+      .filter(
+        rating =>
+          Number.isFinite(rating)
+      );
+
+
+  document.getElementById(
+    'fbAvg'
+  ).textContent =
+    ratings.length
+
+      ? (
+          ratings.reduce(
+            (sum, rating) =>
+              sum + rating,
+            0
+          ) /
+          ratings.length
+        ).toFixed(2) +
+        ' ⭐'
+
+      : '—';
+
+
+  /* ===================================================
+     FEEDBACK LIST
+  ==================================================== */
+
+  const list =
+    document.getElementById(
+      'feedbackList'
+    );
+
+
+  list.innerHTML =
+    feedback.map(f => {
+
+      const rating =
+        Number(f.rating) || 0;
+
+
+      return `
+
+        <div class="feedback-item">
+
+          <div style="
+            display:flex;
+            justify-content:space-between
+          ">
+
+            <span>
+              ${'⭐'.repeat(rating)}
+              ${rating || ''}
+            </span>
+
+            <span class="badge">
+              ${escapeHTML(
+                f.category ||
+                'no category'
+              )}
+            </span>
+
+          </div>
+
+
+          <div style="margin:8px 0">
+
+            ${escapeHTML(
+              (
+                f.comment ||
+                ''
+              ).slice(0,500)
+            )}
+
+          </div>
+
+
+          <div style="
+            font-size:10px;
+            color:var(--muted)
+          ">
+
+            ${escapeHTML(
+              f.email || ''
+            )}
+
+            •
+
+            ${formatDate(
+              f.created_at
+            )}
+
+            •
+
+            ${escapeHTML(
+              f.client_id || ''
+            )}
+
+          </div>
+
+        </div>
+
+      `;
+
+    }).join('');
+
+
+  /* ===================================================
+     RECENT EVENTS
+  ==================================================== */
+
+  const tbody =
+    document.querySelector(
+      '#eventsTable tbody'
+    );
+
+
+  tbody.innerHTML =
+    events
+      .slice(0,200)
+      .map(e => {
+
+        return `
+
+          <tr>
+
+            <td>
+              ${formatDate(
+                e.created_at
+              )}
+            </td>
+
+            <td>
+              ${escapeHTML(
+                eventName(e)
+              )}
+            </td>
+
+            <td>
+              ${escapeHTML(
+                (
+                  e.client_id || ''
+                ).slice(0,8)
+              )}
+            </td>
+
+            <td>
+              ${escapeHTML(
+                JSON.stringify(
+                  e.properties || {}
+                ).slice(0,120)
+              )}
+            </td>
+
+          </tr>
+
+        `;
+
+      })
+      .join('');
+
+}
+
+
+/* =====================================================
+   HELPERS
+===================================================== */
+
+function formatDate(value){
+
+  if(!value){
+    return '—';
+  }
+
+  return new Date(
+    value
+  ).toLocaleString();
+
+}
+
+
+function escapeHTML(value){
+
+  return String(value)
+    .replace(
+      /&/g,
+      '&amp;'
+    )
+    .replace(
+      /</g,
+      '&lt;'
+    )
+    .replace(
+      />/g,
+      '&gt;'
+    )
+    .replace(
+      /"/g,
+      '&quot;'
+    )
+    .replace(
+      /'/g,
+      '&#039;'
+    );
+
+}
+
+
+/* =====================================================
+   EXISTING SESSION CHECK
+===================================================== */
+
+(async function checkExistingSession(){
+
+  try{
+
+    const {
+      data: {
+        session
+      }
+    } =
+      await supabaseClient.auth.getSession();
+
+
+    if(!session?.user){
+
+      return;
+
+    }
+
+
+    /* -----------------------------------------------
+       Verify admin before showing dashboard
+    ------------------------------------------------ */
+
+    const {
+      data: admin,
+      error
+    } =
+      await supabaseClient
+        .from('admin_users')
+        .select('id')
+        .eq(
+          'id',
+          session.user.id
+        )
+        .maybeSingle();
+
+
+    if(error){
+
+      console.error(
+        'Existing session admin check:',
+        error
+      );
+
+      await supabaseClient.auth.signOut();
+
+      return;
+
+    }
+
+
+    if(admin){
+
+      showDashboard();
+
+    }
+
+    else{
+
+      await supabaseClient.auth.signOut();
+
+    }
+
+  }
+
+  catch(error){
+
+    console.error(
+      'Session check failed:',
+      error
+    );
+
+  }
+
+})();
+
+</script>
+
+</body>
+</html>
