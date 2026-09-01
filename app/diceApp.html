@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,400;1,9..144,600&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="icon" type="image/svg" href="favicon.svg">
+<link rel="modulepreload" href="https://unpkg.com/three@0.160.0/build/three.module.js">
 <link rel="apple-touch-icon" href="favicon.svg">
 <link rel="shortcut icon" type="image/svg" href="favicon.svg">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -599,6 +600,153 @@ window.__SUPABASE_ANON_KEY__ = 'sb_publishable_5AblaC5je3t6O1C1lxnVSA_2X0r3A78';
 
 </head>
 <body>
+
+<!-- ============ LOADING OVERLAY (z-200) + INTRO TOUR (z-150) ============ -->
+<style>
+/* ---------- LOADING SCREEN — two dice ---------- */
+#loadingOverlay{
+  position:fixed;inset:0;z-index:200;background:var(--bg);
+  display:grid;place-items:center;overflow:hidden;transition:opacity .55s ease;
+}
+/* hide text until dice are ready */
+#loadingOverlay .load-title,
+#loadingOverlay .load-sub,
+#loadingOverlay .load-bar {
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity .35s ease, transform .35s ease;
+}
+#loadingOverlay.dice-ready .load-title,
+#loadingOverlay.dice-ready .load-sub,
+#loadingOverlay.dice-ready .load-bar {
+  opacity: 1;
+  transform: none;
+}
+#loadingOverlay.leaving{opacity:0;pointer-events:none}
+#loadingOverlay .load-glow{
+  position:absolute;left:50%;top:40%;width:580px;height:580px;transform:translate(-50%,-50%);
+  border-radius:50%;background:var(--accent);filter:blur(150px);opacity:.11;pointer-events:none;
+}
+#loadingCanvas { opacity: 0; transition: opacity .3s ease; }
+#loadingOverlay.dice-ready #loadingCanvas { opacity: 1; }
+
+#loadingOverlay .load-inner{
+  position:relative;display:flex;flex-direction:column;align-items:center;gap:22px;
+  transform:translateY(-2%);transition:transform .55s ease;
+}
+#loadingOverlay.leaving .load-inner{transform:translateY(-2%) scale(.94)}
+#loadingCanvas{width:min(440px,74vw);height:min(250px,42vw);display:block}
+#loadingOverlay.nodice #loadingCanvas{display:none}
+.css-dice{display:none;gap:40px;align-items:center;height:110px}
+#loadingOverlay.nodice .css-dice{display:flex}
+.css-die{
+  width:82px;height:82px;border-radius:18px;background:var(--fg);
+  box-shadow:inset 0 0 0 2px var(--bg),0 20px 46px rgba(0,0,0,.35);
+  position:relative;animation:cssBob 3.2s ease-in-out infinite;
+}
+.css-die::after{
+  content:'';position:absolute;inset:16px;border-radius:9px;
+  background:
+    radial-gradient(circle at 24% 24%, var(--bg) 0 10%, transparent 11%),
+    radial-gradient(circle at 76% 24%, var(--bg) 0 10%, transparent 11%),
+    radial-gradient(circle at 50% 50%, var(--bg) 0 10%, transparent 11%),
+    radial-gradient(circle at 24% 76%, var(--bg) 0 10%, transparent 11%),
+    radial-gradient(circle at 76% 76%, var(--bg) 0 10%, transparent 11%);
+}
+.css-die.d2{width:66px;height:66px;animation-delay:-1.6s;opacity:.85}
+@keyframes cssBob{0%,100%{transform:translateY(-9px) rotate(-4deg)}50%{transform:translateY(9px) rotate(4deg)}}
+.load-title{font-family:'Fraunces',serif;font-weight:900;font-size:clamp(30px,5vw,46px);letter-spacing:-.01em;line-height:1}
+.load-title em{font-style:italic;font-weight:600;color:var(--accent)}
+.load-sub{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.3em;color:var(--muted);display:flex;align-items:center;gap:10px}
+.load-sub .cursor{display:inline-block;width:7px;height:13px;background:var(--accent);animation:blink 1.1s steps(1) infinite}
+.load-bar{width:min(300px,58vw);height:2px;background:var(--border);border-radius:2px;overflow:hidden}
+.load-bar i{display:block;height:100%;width:0;background:var(--accent);border-radius:2px;transition:width .35s ease}
+
+/* ---------- INTRO TOUR ---------- */
+#tourOverlay{position:fixed;inset:0;z-index:150;display:none;transition:background .3s}
+#tourOverlay.open{display:block}
+#tourOverlay.nospot{background:rgba(0,0,0,.74)}
+#tourOverlay.nospot #tourSpot{display:none}
+#tourSpot{
+  position:absolute;border-radius:14px;pointer-events:none;
+  border:1.5px solid rgba(var(--accent-rgb),.85);
+  box-shadow:0 0 26px 4px rgba(var(--accent-rgb),.30), 0 0 0 200vmax rgba(0,0,0,.74);
+  transition:left .4s cubic-bezier(.2,.8,.2,1),top .4s cubic-bezier(.2,.8,.2,1),
+             width .4s cubic-bezier(.2,.8,.2,1),height .4s cubic-bezier(.2,.8,.2,1);
+}
+#tourCard{
+  position:absolute;width:min(370px,calc(100vw - 32px));
+  background:var(--bg-elev);border:1px solid var(--border-strong);border-radius:18px;
+  box-shadow:var(--shadow);padding:20px 20px 15px;z-index:2;
+  opacity:0;transform:translateY(10px) scale(.98);
+  transition:opacity .35s ease,transform .35s ease,
+             left .4s cubic-bezier(.2,.8,.2,1),top .4s cubic-bezier(.2,.8,.2,1);
+}
+#tourOverlay.in #tourCard{opacity:1;transform:none}
+#tourCard:focus{outline:none}
+#tourArrow{position:absolute;width:13px;height:13px;background:var(--bg-elev);
+  border-left:1px solid var(--border-strong);border-top:1px solid var(--border-strong);display:none}
+#tourCard.below #tourArrow{display:block;top:-7.5px;transform:rotate(45deg)}
+#tourCard.above #tourArrow{display:block;bottom:-7.5px;transform:rotate(225deg)}
+.tour-count{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.24em;color:var(--accent);margin-bottom:10px}
+.tour-title{font-family:'Fraunces',serif;font-weight:700;font-size:20px;line-height:1.15;margin-bottom:7px}
+.tour-body{font-size:13.5px;color:var(--fg-dim);line-height:1.62;margin-bottom:15px}
+.tour-body b{color:var(--fg)}
+.tour-body .mono{font-family:'JetBrains Mono',monospace;font-size:11px}
+.tour-body kbd{font-family:'JetBrains Mono',monospace;font-size:10px;border:1px solid var(--border-strong);
+  border-bottom-width:2px;border-radius:5px;padding:1px 6px;color:var(--fg)}
+.tour-dots{display:flex;gap:6px;margin-bottom:13px}
+.t-dot{width:7px;height:7px;border-radius:999px;background:var(--border-strong);padding:0;transition:all .2s}
+.t-dot:hover{background:var(--fg-dim)}
+.t-dot.on{background:var(--accent);box-shadow:0 0 8px rgba(var(--accent-rgb),.7)}
+.tour-nav{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.tour-nav-right{display:flex;gap:8px}
+.t-btn{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10px;letter-spacing:.14em;border-radius:999px;padding:10px 18px;transition:all .2s}
+.t-btn.prime{background:var(--accent);color:var(--bg);box-shadow:0 6px 18px rgba(var(--accent-rgb),.3)}
+.t-btn.prime:hover{transform:translateY(-1px)}
+.t-btn.sec{border:1px solid var(--border-strong);background:var(--bg-elev-2);color:var(--fg)}
+.t-btn.sec:hover{border-color:var(--accent);color:var(--accent)}
+.t-btn.ghost{color:var(--muted);padding:10px 8px}
+.t-btn.ghost:hover{color:var(--bad)}
+body.tour-on{overflow:hidden}
+body.tour-on .install-prompt{display:none !important}
+@media(max-width:640px){
+  #tourCard{left:12px !important;right:12px;top:auto !important;width:auto;
+    bottom:calc(14px + env(safe-area-inset-bottom));transform:none;transition:opacity .3s}
+  #tourOverlay.in #tourCard{transform:none}
+  #tourArrow{display:none !important}
+  #tourSpot{transition:none}
+}
+</style>
+
+<div id="loadingOverlay" aria-label="Loading The Dice">
+  <div class="load-glow"></div>
+  <div class="load-inner">
+    <canvas id="loadingCanvas" aria-hidden="true"></canvas>
+    <div class="css-dice" aria-hidden="true"><div class="css-die d1"></div><div class="css-die d2"></div></div>
+    <div class="load-title">THE <em>DICE</em></div>
+    <div class="load-sub"><span>LOADING ENGINE</span><span class="cursor"></span></div>
+    <div class="load-bar"><i id="loadBarFill"></i></div>
+  </div>
+</div>
+
+<div id="tourOverlay" aria-hidden="true">
+  <div id="tourSpot"></div>
+  <div id="tourCard" role="dialog" aria-modal="true" aria-labelledby="tourTitle" tabindex="-1">
+    <div id="tourArrow"></div>
+    <div class="tour-count" id="tourStepLabel">STEP 1 / 9</div>
+    <h3 class="tour-title" id="tourTitle"></h3>
+    <p class="tour-body" id="tourBody"></p>
+    <div class="tour-dots" id="tourDots"></div>
+    <div class="tour-nav">
+      <button class="t-btn ghost" id="tourSkip" type="button">SKIP TOUR</button>
+      <div class="tour-nav-right">
+        <button class="t-btn sec" id="tourBack" type="button">BACK</button>
+        <button class="t-btn prime" id="tourNext" type="button">NEXT</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="bg-grid-layer"></div>
 <div class="float-dot d1"></div>
@@ -2591,6 +2739,466 @@ if ('serviceWorker' in navigator) {
     window.location.reload();
   });
 }
+</script>
+
+<script type="module">
+/* ================================================================
+   THE DICE 2.0 — Loading overlay (two dice) + first-run intro tour
+   Self-contained · no framework · reuses the Three.js importmap
+   ================================================================ */
+(() => {
+  'use strict';
+
+  /* ==============================================================
+     PART 1 — LOADING OVERLAY
+     ============================================================== */
+  const overlay  = document.getElementById('loadingOverlay');
+  const barFill  = document.getElementById('loadBarFill');
+  const MIN_SHOW = 1200;   // premium minimum (ms)
+  const MAX_WAIT = 6000;   // hard ceiling — never trap the user
+  const t0 = performance.now();
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* app-ready signals — add ONE line at the end of your main module:*/
+         window.dispatchEvent(new Event('dice:ready'));
+   /*  Also honored: window.__APP_READY__ = true
+     Fallbacks: the window 'load' event, then the MAX_WAIT ceiling. */
+  let appReady = (window.__APP_READY__ === true) || document.readyState === 'complete';
+  window.addEventListener('dice:ready', () => { appReady = true; }, { once:true });
+  window.addEventListener('load',     () => { appReady = true; }, { once:true });
+
+  /* dice face texture — same square-edged look, themed colors */
+    async function buildMiniScene(){
+    let THREE, RoundedBoxGeometry, mergeGeometries;
+    try {
+      THREE = await import('three');
+      const rb = await import('three/addons/geometries/RoundedBoxGeometry.js');
+      const mu = await import('three/addons/utils/BufferGeometryUtils.js');
+      RoundedBoxGeometry = rb.RoundedBoxGeometry;
+      mergeGeometries = mu.mergeGeometries;
+    } catch(e){ return null; }
+
+    const canvas = document.getElementById('loadingCanvas');
+    if (!canvas) return null;
+
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+    renderer.setClearColor(0x000000, 0);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(38, 1.7,.1, 50);
+    camera.position.set(0, 1.35, 5.4);
+    camera.lookAt(0, 0, 0);
+
+    scene.add(new THREE.AmbientLight(0xffffff,.65));
+    const key = new THREE.DirectionalLight(0xffffff, 1.35); key.position.set(3, 5, 4); scene.add(key);
+    const rim = new THREE.DirectionalLight(0xffffff,.45); rim.position.set(-4, 1, -3); scene.add(rim);
+
+    // ---- EXACT DiceApp stage die definition ----
+    const UP = new THREE.Vector3(0,1,0);
+    const FNL = {
+      1:new THREE.Vector3(0,0,1), 6:new THREE.Vector3(0,0,-1),
+      2:new THREE.Vector3(1,0,0), 5:new THREE.Vector3(-1,0,0),
+      3:new THREE.Vector3(0,1,0), 4:new THREE.Vector3(0,-1,0)
+    };
+    const PIPS = {1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
+    const TANG = {};
+    for(let v=1;v<=6;v++){
+      const n=FNL[v], ref=Math.abs(n.y)>.9?new THREE.Vector3(1,0,0):new THREE.Vector3(0,1,0);
+      const u=new THREE.Vector3().crossVectors(ref,n).normalize();
+      const w=new THREE.Vector3().crossVectors(n,u).normalize();
+      TANG[v]={u,w,quat:new THREE.Quaternion().setFromUnitVectors(UP,n)};
+    }
+
+    const cs = getComputedStyle(document.documentElement);
+    const bodyCStr = cs.getPropertyValue('--fg').trim() || '#f0ead6';
+    const pipCStr = cs.getPropertyValue('--bg').trim() || '#0c0b09';
+    const SKIN_ROUGH = 0.34;
+
+    // Build shared die assets - RoundedBox + real pip cylinders (DiceApp exact)
+    const bodyGeo = new RoundedBoxGeometry(1, 1, 1, 3, 0.045);
+    const tmpl = new THREE.CylinderGeometry(0.08, 0.08, 0.06, 22, 1, false);
+    const parts = [];
+    const M = new THREE.Matrix4();
+    const _vB = new THREE.Vector3();
+    for(let v=1; v<=6; v++){
+      const {u,w,quat} = TANG[v], n = FNL[v];
+      for(const idx of PIPS[v]){
+        const a=(idx%3)-1, b=Math.floor(idx/3)-1;
+        const g = tmpl.clone();
+        _vB.copy(n).multiplyScalar(0.474).addScaledVector(u, a*0.27).addScaledVector(w, b*0.27);
+        M.compose(_vB, quat, new THREE.Vector3(1,1,1));
+        g.applyMatrix4(M);
+        parts.push(g);
+      }
+    }
+    const pipGeo = mergeGeometries(parts);
+    parts.forEach(g=>g.dispose());
+    tmpl.dispose();
+
+    const bodyMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(bodyCStr), roughness: SKIN_ROUGH, metalness: 0.06 });
+    const pipMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(pipCStr), roughness: 0.5, metalness: 0.05 });
+
+    const dieGroups = [
+      { x:-1.28, baseY:.10, z:.30, phase:0.0, scale:1.00, rx:.18, rz:-.10 },
+      { x: 1.30, baseY:-.12, z:-.25, phase:2.1, scale:0.84, rx:-.14, rz:.14 }
+    ].map(cfg => {
+      const grp = new THREE.Group();
+      grp.add(new THREE.Mesh(bodyGeo, bodyMat));
+      grp.add(new THREE.Mesh(pipGeo, pipMat));
+      grp.position.set(cfg.x, cfg.baseY, cfg.z);
+      grp.scale.setScalar(cfg.scale);
+      grp.rotation.set(cfg.rx, cfg.phase*2, cfg.rz);
+      grp.userData = cfg;
+      scene.add(grp);
+      return grp;
+    });
+
+    function fit(){
+      const r = canvas.getBoundingClientRect();
+      if (!r.width ||!r.height) return;
+      renderer.setSize(r.width, r.height, false);
+      camera.aspect = r.width / r.height;
+      camera.updateProjectionMatrix();
+      renderer.render(scene, camera);
+    }
+    fit();
+    window.addEventListener('resize', fit);
+
+    let raf = 0;
+    function tick(t){
+      const time = t/1000;
+      for(const d of dieGroups){
+        const c = d.userData;
+        d.rotation.y += 0.003;
+        d.rotation.x = c.rx + Math.sin(time*.7 + c.phase)*.07;
+        d.rotation.z = c.rz + Math.cos(time*.5 + c.phase)*.06;
+        d.position.y = c.baseY + Math.sin(time*1.1 + c.phase)*.14;
+      }
+      renderer.render(scene, camera);
+      raf = requestAnimationFrame(tick);
+    }
+    if (!reduced) raf = requestAnimationFrame(tick);
+
+    return {
+      stop(){ cancelAnimationFrame(raf); window.removeEventListener('resize', fit); },
+      dispose(){
+        bodyGeo.dispose();
+        pipGeo.dispose();
+        bodyMat.dispose();
+        pipMat.dispose();
+        renderer.dispose();
+      }
+    };
+  }
+
+  let mini = null, hidden = false;
+
+  function hideLoading(){
+    if (hidden || !overlay) return;
+    hidden = true;
+    if (barFill) barFill.style.width = '100%';
+    overlay.classList.add('leaving');
+    setTimeout(() => {
+      if (mini){ mini.stop(); mini.dispose(); mini = null; }   // free GPU memory
+      overlay.remove();
+      window.dispatchEvent(new Event('dice:loaded'));
+      maybeStartTour();                                        // → PART 2
+    }, 580);
+  }
+
+  async function runLoading(){
+    mini = await buildMiniScene();
+    if (overlay) overlay.classList.add('dice-ready'); // <-- ADD THIS
+    if (!overlay){ maybeStartTour(); return; }
+    if (!mini) overlay.classList.add('nodice');   // three failed → CSS dice
+
+    /* progress theater — creeps to 90%, snaps to 100% when ready */
+    let p = 0;
+    const creep = setInterval(() => {
+      p = Math.min(p + 2 + Math.random() * 6, 90);
+      if (barFill) barFill.style.width = p + '%';
+    }, 170);
+
+    let done = false;
+    const ready = () => {
+      if (done) return;
+      done = true;
+      clearInterval(creep);
+      const elapsed = performance.now() - t0;
+      setTimeout(hideLoading, Math.max(0, MIN_SHOW - elapsed) + 420);
+    };
+
+    if (appReady) ready();
+    const poll = setInterval(() => {
+      if (appReady || window.__APP_READY__ === true){ clearInterval(poll); ready(); }
+    }, 120);
+    setTimeout(() => { clearInterval(poll); ready(); }, MAX_WAIT);   // hard ceiling
+  }
+
+  if (overlay) runLoading(); else maybeStartTour();
+
+  /* ==============================================================
+     PART 2 — FIRST-RUN INTRO TOUR  (localStorage: dice_intro_seen)
+     ============================================================== */
+  const SEEN_KEY = 'dice_intro_seen';
+
+  const TOUR_STEPS = [
+    { title:'Welcome to THE DICE',
+      body:'Hi! Lemme show you how to use The Dice — a neutral, verifiable decision engine. About a minute, and you can skip any time.',
+      target:null },
+    { title:'What are we deciding?',
+      body:'Type a title like <i>"Who presents first?"</i> — it carries through to the result, the decision record and the printed PDF.',
+      target:'#titleInput' },
+    { title:'People vs Options',
+      body:'PEOPLE mode defaults to 6 names, OPTIONS to 2. Switch any time — your list adapts automatically.',
+      target:'#modeSeg' },
+    { title:'Tag your decision',
+      body:'Pick a category — it tags the decision type on records, analytics and PDF exports.',
+      target:'#catChips' },
+    { title:'The choices',
+      body:'Add names or leave it empty — empty slots become <b>Person 1</b>, <b>Option 1</b>… automatically. Remove with the <b>✕</b>, add up to <b>36</b>, press <kbd>Enter</kbd> to quick-add.',
+      target:'#choicesList', alt:['#addChoiceBtn'] },
+    { title:'Fair by construction',
+      body:'Equal probability is verified before every cast. Then <b>CAST</b> — the <kbd>Space</kbd> bar works too.',
+      target:['.fair', '#castBtn'] },
+    { title:'The stage',
+      body:'Drag to orbit, wheel to zoom. Three cameras: <b>Perspective / Top-Down / Table-Level</b>. The theme toggles restyle the whole app — dice body included.',
+      target:'#stage' },
+    { title:'After the roll',
+      body:'<b>Accept</b> locks the decision · <b>Roll Again</b> repeats the cast (repeat rolls are tracked) · <b>View Record</b> opens the full audit trail · <b>Restart</b> clears everything. On mobile, this panel sits below the stage.',
+      target:['#acceptBtn','#rollAgainBtn','#recordBtn','#restartBtn'],
+      alt:['#resultPane','.res-actions'], preview:true },
+    { title:'Share it, keep proof',
+      body:'<b>Share Decision</b> generates a referral link (<span class="mono">utm_source=share</span>) · <b>Print Record</b> makes a PDF for your files · the <b>Feedback</b> button (bottom-right) takes a rating, category and optional email.',
+      target:['#shareDecision','#printRecord','#feedbackFab'],
+      alt:['#feedbackFab','#resultPane'], preview:true }
+  ];
+
+  const tourEl  = document.getElementById('tourOverlay');
+  const spotEl  = document.getElementById('tourSpot');
+  const cardEl  = document.getElementById('tourCard');
+  const arrowEl = document.getElementById('tourArrow');
+  const stepEl  = document.getElementById('tourStepLabel');
+  const titleEl = document.getElementById('tourTitle');
+  const bodyEl  = document.getElementById('tourBody');
+  const dotsEl  = document.getElementById('tourDots');
+  const skipB   = document.getElementById('tourSkip');
+  const backB   = document.getElementById('tourBack');
+  const nextB   = document.getElementById('tourNext');
+
+  /* ---- step 8/9: result-pane preview (mock or real result) ---- */
+  const preview = { active:false, saved:null, texts:{} };
+  function showPane(el, show){ el.hidden = !show; el.style.display = show ? '' : 'none'; }
+
+  function enterResultPreview(){
+    if (preview.active) return;
+    const setup = document.getElementById('setupPane');
+    const res   = document.getElementById('resultPane');
+    if (!setup || !res) return;
+    preview.active = true;
+    preview.saved  = { setupHidden: setup.hidden, resHidden: res.hidden };
+    if (res.hidden){
+      showPane(setup, false);
+      showPane(res, true);
+      const mock = {
+        resNumber:'#04', resName:'Person 4',
+        resContext:'GENERAL DECISION · TOUR PREVIEW',
+        resProb:'16.67% EACH', resChoicesN:'6', resDice:'D6 · FACE 04',
+        resId:'— preview —', resTs:new Date().toLocaleString(),
+        resHash:'no roll recorded — tour preview'
+      };
+      preview.texts = {};
+      for (const id in mock){
+        const el = document.getElementById(id);
+        if (el && (el.textContent.trim() === '—' || el.textContent.trim() === '#01')){
+          preview.texts[id] = el.textContent;      // only mock placeholders — real results stay
+          el.textContent = mock[id];
+        }
+      }
+    }
+  }
+  function exitResultPreview(){
+    if (!preview.active) return;
+    for (const id in preview.texts){
+      const el = document.getElementById(id);
+      if (el) el.textContent = preview.texts[id];
+    }
+    const setup = document.getElementById('setupPane');
+    const res   = document.getElementById('resultPane');
+    if (setup && preview.saved){ setup.style.display=''; setup.hidden = preview.saved.setupHidden; }
+    if (res   && preview.saved){ res.style.display='';   res.hidden   = preview.saved.resHidden; }
+    preview.active = false; preview.saved = null; preview.texts = {};
+  }
+
+  /* ---- spotlight rect resolution (skips hidden/zero-size elements) ---- */
+  function visibleRect(sel){
+    const el = document.querySelector(sel);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return (r.width < 4 || r.height < 4) ? null : r;
+  }
+  function stepRect(st){
+    const sels = [].concat(st.target || [], st.alt || []);
+    const rects = sels.map(visibleRect).filter(Boolean);
+    if (!rects.length) return null;
+    const pad = 10;
+    let L=Infinity, T=Infinity, R=-Infinity, B=-Infinity;
+    for (const r of rects){ L=Math.min(L,r.left); T=Math.min(T,r.top); R=Math.max(R,r.right); B=Math.max(B,r.bottom); }
+    return { left:L-pad, top:T-pad, width:R-L+pad*2, height:B-T+pad*2, cx:(L+R)/2 };
+  }
+
+  /* ---- rAF tracking loop: spotlight follows target through smooth scrolls ---- */
+  let tourOn = false, step = 0, rafTour = 0;
+
+  function placeCard(rect){
+    if (innerWidth <= 640) return;               // mobile = fixed bottom sheet (CSS)
+    const vw = innerWidth, vh = innerHeight;
+    const cw = Math.min(370, vw - 32);
+    const ch = cardEl.offsetHeight || 210;
+    cardEl.classList.remove('above', 'below');
+    if (!rect){                                  // centered welcome card
+      cardEl.style.left = Math.max(16, (vw - cw) / 2) + 'px';
+      cardEl.style.top  = Math.max(84, (vh - ch) / 2 - 30) + 'px';
+      return;
+    }
+    let top, side = 'below';
+    const belowTop = rect.top + rect.height + 18;
+    const aboveTop = rect.top - ch - 18;
+    if (belowTop + ch <= vh - 16)      top = belowTop;
+    else if (aboveTop >= 16)          { top = aboveTop; side = 'above'; }
+    else                               top = Math.max(16, Math.min(rect.top + 24, vh - ch - 16));
+    let left = rect.left;
+    if (left + cw > vw - 16) left = vw - 16 - cw;
+    if (left < 16)           left = 16;
+    cardEl.style.top  = top  + 'px';
+    cardEl.style.left = left + 'px';
+    cardEl.classList.add(side);
+    arrowEl.style.left = (Math.min(Math.max(rect.cx - left, 26), cw - 26) - 6.5) + 'px';
+  }
+
+  function frame(){
+    if (!tourOn) return;
+    const rect = stepRect(TOUR_STEPS[step]);
+    if (rect){
+      tourEl.classList.remove('nospot');
+      spotEl.style.display = '';
+      spotEl.style.left   = rect.left  + 'px';
+      spotEl.style.top    = rect.top   + 'px';
+      spotEl.style.width  = rect.width + 'px';
+      spotEl.style.height = rect.height + 'px';
+      placeCard(rect);
+    } else {
+      tourEl.classList.add('nospot');
+      placeCard(null);
+    }
+    rafTour = requestAnimationFrame(frame);
+  }
+
+  function ensureVisible(){
+    const st = TOUR_STEPS[step];
+    if (!st || !st.target) return;
+    const el = document.querySelector(Array.isArray(st.target) ? st.target[0] : st.target);
+    if (el){
+      try { el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block:'center' }); }
+      catch(e){ el.scrollIntoView(); }
+    }
+  }
+
+  function renderDots(){
+    dotsEl.innerHTML = '';
+    TOUR_STEPS.forEach((_, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 't-dot' + (i === step ? ' on' : '');
+      b.setAttribute('aria-label', 'Step ' + (i + 1));
+      b.addEventListener('click', () => goto(i));
+      dotsEl.appendChild(b);
+    });
+  }
+
+  function renderStep(){
+    const st = TOUR_STEPS[step];
+    stepEl.textContent  = 'STEP ' + (step + 1) + ' / ' + TOUR_STEPS.length;
+    titleEl.textContent = st.title;
+    bodyEl.innerHTML    = st.body;
+    backB.style.visibility = step === 0 ? 'hidden' : 'visible';
+    nextB.textContent = step === 0 ? 'START TOUR'
+                      : step === TOUR_STEPS.length - 1 ? 'FINISH ✓' : 'NEXT';
+    renderDots();
+  }
+
+  function goto(n){
+    if (!tourOn) return;
+    n = Math.max(0, Math.min(TOUR_STEPS.length - 1, n));
+    const prev = TOUR_STEPS[step], next = TOUR_STEPS[n];
+    if (prev && prev.preview && !(next && next.preview)) exitResultPreview();
+    if (next && next.preview && !(prev && prev.preview)) enterResultPreview();
+    if (n === step) return;
+    step = n;
+    renderStep();
+    ensureVisible();
+  }
+
+  function onKey(e){
+    if (!tourOn) return;
+    if (e.key === 'Escape'){ e.preventDefault(); endTour(); }
+    else if (e.key === 'ArrowRight') goto(step + 1);
+    else if (e.key === 'ArrowLeft')  goto(step - 1);
+    else if (e.key === 'Enter'){
+      const a = document.activeElement;
+      if (a && a.closest && a.closest('#tourCard') && a.tagName === 'BUTTON') return;
+      e.preventDefault();
+      step === TOUR_STEPS.length - 1 ? endTour() : goto(step + 1);
+    }
+  }
+
+  function startTour(){
+    if (tourOn || !tourEl || !cardEl) return;
+    tourOn = true; step = 0;
+    document.body.classList.add('tour-on');
+    tourEl.setAttribute('aria-hidden', 'false');
+    tourEl.classList.add('open');
+    renderStep();
+    ensureVisible();
+    document.addEventListener('keydown', onKey);
+    rafTour = requestAnimationFrame(frame);
+    requestAnimationFrame(() => requestAnimationFrame(() => tourEl.classList.add('in')));
+    try { cardEl.focus({ preventScroll:true }); } catch(e){}
+  }
+
+  function endTour(){
+    if (!tourOn) return;
+    tourOn = false;
+    cancelAnimationFrame(rafTour);
+    document.removeEventListener('keydown', onKey);
+    exitResultPreview();
+    tourEl.classList.remove('open', 'in', 'nospot');
+    tourEl.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('tour-on');
+    try { localStorage.setItem(SEEN_KEY, '1'); } catch(e){}
+    window.dispatchEvent(new Event('dice:tour-done'));
+  }
+
+  if (skipB) skipB.addEventListener('click', endTour);
+  if (backB) backB.addEventListener('click', () => goto(step - 1));
+  if (nextB) nextB.addEventListener('click', () => {
+    step === TOUR_STEPS.length - 1 ? endTour() : goto(step + 1);
+  });
+
+  function seenBefore(){
+    try { return localStorage.getItem(SEEN_KEY) === '1'; } catch(e){ return false; }
+  }
+  function maybeStartTour(){
+    let force = false;
+    try { force = /[?&]tour=1\b/.test(location.search); } catch(e){}
+    if (force || !seenBefore()) setTimeout(startTour, 480);
+  }
+
+  /* public hooks */
+  window.diceStartTour = startTour;
+  window.diceEndTour   = endTour;
+})();
 </script>
 
 <script>
